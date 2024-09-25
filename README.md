@@ -16,6 +16,13 @@ uv run dagster dev
 
 Open http://localhost:3000 with your browser to see the project.
 
+## Secrets
+```bash
+cp .env.example .env
+```
+
+Then fill in the .env file with the necessary API keys
+
 ## Development
 
 ### Adding new Python dependencies
@@ -31,3 +38,7 @@ Tests are in the `weave_tests` directory and you can run tests using `pytest`:
 ```bash
 uv run pytest weave_tests
 ```
+
+### ADRs
+Architectural Decision Records are in the `adrs` directory. They're Jupyter notebooks
+which should run in the default `uv` venv.

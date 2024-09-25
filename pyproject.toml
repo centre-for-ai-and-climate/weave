@@ -8,6 +8,10 @@ dependencies = [
     "dagster>=1.8.8",
     "dagster-cloud>=1.8.8",
     "weave",
+    "aiohttp[speedups]>=3.10.5",
+    "python-dotenv>=1.0.1",
+    "pandas>=2.2.3",
+    "pyarrow>=17.0.0",
 ]
 
 [build-system]
@@ -24,6 +28,7 @@ code_location_name = "weave"
 [tool.uv]
 dev-dependencies = [
     "dagster-webserver>=1.8.8",
+    "jupyter>=1.1.1",
     "pytest>=8.3.3",
 ]
 
