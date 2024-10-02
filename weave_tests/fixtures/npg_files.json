@@ -1,0 +1,154 @@
+{
+  "links": [
+    {
+      "rel": "self",
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments"
+    }
+  ],
+  "attachments": [
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_december2023_zip",
+      "metas": {
+        "id": "npg_substation_december2023_zip",
+        "title": "NPg_Substation_December2023.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_december2023_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_december2023_zip",
+      "metas": {
+        "id": "npg_feeder_december2023_zip",
+        "title": "NPg_Feeder_December2023.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_december2023_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_november2023_zip",
+      "metas": {
+        "id": "npg_substation_november2023_zip",
+        "title": "NPg_Substation_November2023.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_november2023_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_november2023_zip",
+      "metas": {
+        "id": "npg_feeder_november2023_zip",
+        "title": "NPg_Feeder_November2023.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_november2023_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_january2024_zip",
+      "metas": {
+        "id": "npg_substation_january2024_zip",
+        "title": "NPg_Substation_January2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_january2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_january2024_zip",
+      "metas": {
+        "id": "npg_feeder_january2024_zip",
+        "title": "NPg_Feeder_January2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_january2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_february2024_zip",
+      "metas": {
+        "id": "npg_substation_february2024_zip",
+        "title": "NPg_Substation_February2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_february2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_february2024_zip",
+      "metas": {
+        "id": "npg_feeder_february2024_zip",
+        "title": "NPg_Feeder_February2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_february2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_march2024_zip",
+      "metas": {
+        "id": "npg_substation_march2024_zip",
+        "title": "NPg_Substation_March2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_march2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_march2024_zip",
+      "metas": {
+        "id": "npg_feeder_march2024_zip",
+        "title": "NPg_Feeder_March2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_march2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_april2024_zip",
+      "metas": {
+        "id": "npg_substation_april2024_zip",
+        "title": "NPg_Substation_April2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_april2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_april2024_zip",
+      "metas": {
+        "id": "npg_feeder_april2024_zip",
+        "title": "NPg_Feeder_April2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_april2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_may2024_zip",
+      "metas": {
+        "id": "npg_substation_may2024_zip",
+        "title": "NPg_Substation_May2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_may2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_may2024_zip",
+      "metas": {
+        "id": "npg_feeder_may2024_zip",
+        "title": "NPg_Feeder_May2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_may2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_june2024_zip",
+      "metas": {
+        "id": "npg_substation_june2024_zip",
+        "title": "NPg_Substation_June2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_substation_june2024_zip"
+      }
+    },
+    {
+      "href": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_june2024_zip",
+      "metas": {
+        "id": "npg_feeder_june2024_zip",
+        "title": "NPg_Feeder_June2024.zip",
+        "mimetype": "application/zip",
+        "url": "https://northernpowergrid.opendatasoft.com/api/explore/v2.1/catalog/datasets/aggregated-smart-metering-data/attachments/npg_feeder_june2024_zip"
+      }
+    }
+  ]
+}

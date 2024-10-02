@@ -12,6 +12,8 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "pandas>=2.2.3",
     "pyarrow>=17.0.0",
+    "requests>=2.32.3",
+    "responses>=0.25.3",
 ]
 
 [build-system]
