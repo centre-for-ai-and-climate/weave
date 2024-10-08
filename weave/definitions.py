@@ -2,12 +2,12 @@ import os
 
 from dagster import Definitions, load_assets_from_modules
 
-from .assets import dno_smart_meter_files
+from .assets import dno_lv_feeder_files
 from .resources.raw_files import RawFilesResource
 from .resources.ssen import LiveSSENAPIClient
 from .sensors import ssen_lv_feeder_files_sensor
 
-all_assets = load_assets_from_modules([dno_smart_meter_files])
+all_assets = load_assets_from_modules([dno_lv_feeder_files])
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR = os.path.join(CURRENT_DIR, "..", "data")

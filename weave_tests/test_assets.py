@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from dagster import build_asset_context
 
-from weave.assets.dno_smart_meter_files import ssen_lv_feeder_files
+from weave.assets.dno_lv_feeder_files import ssen_lv_feeder_files
 from weave.resources.raw_files import RawFilesResource
 from weave.resources.ssen import TestSSENAPIClient
 

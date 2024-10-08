@@ -38,7 +38,7 @@ ssen_lv_feeder_files_job = define_asset_job(
     config={
         "execution": {
             "config": {
-                "multiprocess": {"config": {"max_concurrent": 5}},
+                "multiprocess": {"max_concurrent": 3},
             }
         }
     },

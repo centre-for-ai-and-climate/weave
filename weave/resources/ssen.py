@@ -64,16 +64,16 @@ class LiveSSENAPIClient(SSENAPIClient):
                 level=9, method=zlib.DEFLATED, wbits=zlib.MAX_WBITS | 16
             )
             for chunk in r.iter_content(chunk_size=10 * 1024 * 1024):
-                self._log_download_progress(context, total_size, downloaded_size, chunk)
+                downloaded_size += len(chunk)
+                self._log_download_progress(context, total_size, downloaded_size)
                 output_file.write(compressor.compress(chunk))
             output_file.write(compressor.flush())
             context.log.info(
                 f"Downloaded {url} - total size: {humanize.naturalsize(total_size)}"
             )
 
-    def _log_download_progress(self, context, total_size, downloaded_size, chunk):
+    def _log_download_progress(self, context, total_size, downloaded_size):
         if total_size > 0:
-            downloaded_size += len(chunk)
             progress = int(downloaded_size / total_size * 100)
             context.log.info(
                 f"{progress}% ({humanize.naturalsize(downloaded_size)}) downloaded"

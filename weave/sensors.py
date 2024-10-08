@@ -6,7 +6,7 @@ from dagster import (
     sensor,
 )
 
-from .assets.dno_smart_meter_files import (
+from .assets.dno_lv_feeder_files import (
     ssen_lv_feeder_files_job,
     ssen_lv_feeder_files_partitions_def,
 )
