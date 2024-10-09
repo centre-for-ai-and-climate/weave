@@ -1,0 +1,4 @@
+locations:
+- code_source:
+    module_name: weave.definitions
+  location_name: weave
