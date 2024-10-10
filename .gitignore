@@ -7,3 +7,6 @@ __pycache__
 !.dagster/dagster.yaml
 data/**/*.csv
 data/**/*.csv.gz
+.coverage
+coverage.xml
+pytest.xml

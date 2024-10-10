@@ -14,8 +14,48 @@ env:
   DAGSTER_CLOUD_FILE: 'dagster_cloud.yaml'
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v1
+
+  tests:
+    name: Tests
+    needs: lint
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install the project
+        run: uv sync --all-extras --dev
+
+      - name: Run tests
+        run: uv run pytest --junit-xml=pytest.xml --cov-report "xml:coverage.xml" --cov=weave weave_tests/
+
+      - name: Pytest coverage comment
+        uses: MishaKav/pytest-coverage-comment@main
+        with:
+          pytest-xml-coverage-path: coverage.xml
+          junitxml-path: pytest.xml
+
   dagster_cloud_default_deploy:
     name: Dagster Serverless Deploy
+    needs: tests
     runs-on: ubuntu-20.04
 
     steps:

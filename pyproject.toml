@@ -34,9 +34,9 @@ code_location_name = "weave"
 dev-dependencies = [
     "dagster-webserver>=1.8.8",
     "jupyter>=1.1.1",
+    "pytest-cov>=5.0.0",
     "pytest>=8.3.3",
 ]
 
 [tool.uv.sources]
-dagster-log-processing = { workspace = true }
 weave = { workspace = true }
