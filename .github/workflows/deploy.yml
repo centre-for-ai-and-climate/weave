@@ -15,8 +15,16 @@ env:
   DAGSTER_CLOUD_FILE: 'dagster_cloud.yaml'
 
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  tests:
+    needs: lint
+    uses: ./.github/workflows/test.yml
+
   dagster_cloud_default_deploy:
     name: Dagster Serverless Deploy
+    needs: tests
     runs-on: ubuntu-20.04
 
     steps:
