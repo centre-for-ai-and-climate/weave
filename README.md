@@ -42,3 +42,9 @@ uv run pytest weave_tests
 ### ADRs
 Architectural Decision Records are in the `adrs` directory. They're Jupyter notebooks
 which should run in the default `uv` venv.
+
+## Deployment
+The main branch is automatically deployed to dagster.io's serverless cloud hosting
+through Github actions
+
+Pull requests are deployed to a "branch deploy" where they can be tested independently
