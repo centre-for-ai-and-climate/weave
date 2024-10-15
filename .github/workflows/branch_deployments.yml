@@ -1,7 +1,7 @@
 name: Serverless Branch Deployments
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
 
 concurrency:
   # Cancel in-progress deploys to same branch
@@ -63,20 +63,3 @@ jobs:
           python_version: ${{ env.PYTHON_VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  s3_bucket_cleanup:
-    name: S3 Cleanup after branch deploy PR close
-    if: github.event.action == 'closed'
-    runs-on: ubuntu-20.04
-    permissions:
-      id-token: write
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::872515293554:role/gha-branch-deploys-s3
-          role-session-name: GitHub_to_AWS_via_FederatedOIDC
-          aws-region: eu-west-2
-      - name: Clean up S3 on close or merge
-        run: |
-          aws s3 rm s3://weave.energy-branches/ --recursive --exclude "*" --include "$GITHUB_HEAD_REF*"
