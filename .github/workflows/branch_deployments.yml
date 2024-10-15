@@ -64,3 +64,11 @@ jobs:
           python_version: ${{ env.PYTHON_VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up S3 on close or merge
+        if: github.event.action == 'closed'
+        run:
+          aws s3 rm s3://bucket/ --recursive --exclude "*" --include "$GITHUB_HEAD_REF*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
