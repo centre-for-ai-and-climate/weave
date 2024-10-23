@@ -26,7 +26,8 @@ class SSENAPIClient(ConfigurableResource, ABC):
     ):
         pass
 
-    def filename_for_url(self, url: str) -> str:
+    @classmethod
+    def filename_for_url(cls, url: str) -> str:
         return url.split("/")[-1]
 
     def _map_available_files(self, api_response: dict) -> list[AvailableFile]:

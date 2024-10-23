@@ -27,7 +27,7 @@ def ssen_lv_feeder_files(
     ssen_api_client: SSENAPIClient,
 ) -> None:
     url = context.partition_key
-    filename = f"{ssen_api_client.filename_for_url(url)}.gz"
+    filename = f"{SSENAPIClient.filename_for_url(url)}.gz"
     with raw_files_resource.open(DNO.SSEN.value, filename, mode="wb") as f:
         ssen_api_client.download_file(context, url, f)
 
