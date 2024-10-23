@@ -8,7 +8,7 @@ from dagster import (
 )
 
 from ..core import DNO
-from ..resources.raw_files import RawFilesResource
+from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
 
 ssen_lv_feeder_files_partitions_def = DynamicPartitionsDefinition(
@@ -23,7 +23,7 @@ ssen_lv_feeder_files_partitions_def = DynamicPartitionsDefinition(
 )
 def ssen_lv_feeder_files(
     context: AssetExecutionContext,
-    raw_files_resource: RawFilesResource,
+    raw_files_resource: OutputFilesResource,
     ssen_api_client: SSENAPIClient,
 ) -> None:
     url = context.partition_key
