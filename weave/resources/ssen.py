@@ -30,6 +30,13 @@ class SSENAPIClient(ConfigurableResource, ABC):
     def filename_for_url(cls, url: str) -> str:
         return url.split("/")[-1]
 
+    @classmethod
+    def month_partition_from_url(cls, url: str) -> str:
+        filename = cls.filename_for_url(url)
+        bare_filename = filename.rstrip(".csv")
+        year, month, day = bare_filename.split("-")
+        return f"{year}-{month}-01"
+
     def _map_available_files(self, api_response: dict) -> list[AvailableFile]:
         available = [self._map_available_file(o) for o in api_response["objects"]]
         return sorted(available, key=lambda f: f.filename)
