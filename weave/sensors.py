@@ -41,7 +41,7 @@ def ssen_lv_feeder_files_sensor(
         return SkipReason(skip_message="No new files found")
 
 
-@sensor(job=ssen_lv_feeder_monthly_parquet_job)
+@sensor(job=ssen_lv_feeder_monthly_parquet_job, minimum_interval_seconds=60 * 5)
 def ssen_lv_feeder_monthly_parquet_sensor(context: SensorEvaluationContext):
     """Sensor for monthly partitioned parquet files from SSEN's raw data.
 
