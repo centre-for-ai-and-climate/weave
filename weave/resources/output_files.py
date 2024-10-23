@@ -2,7 +2,7 @@ import fsspec
 from dagster import ConfigurableResource
 
 
-class RawFilesResource(ConfigurableResource):
+class OutputFilesResource(ConfigurableResource):
     """Wrap fsspec to be aware of our naming conventions for raw files"""
 
     url: str

@@ -2,12 +2,14 @@ import os
 
 from dagster import Definitions, load_assets_from_modules
 
-from .assets import dno_lv_feeder_files
-from .resources.raw_files import RawFilesResource
+from .assets import dno_lv_feeder_files, dno_lv_feeder_monthly_parquet
+from .resources.output_files import OutputFilesResource
 from .resources.ssen import LiveSSENAPIClient
-from .sensors import ssen_lv_feeder_files_sensor
+from .sensors import ssen_lv_feeder_files_sensor, ssen_lv_feeder_monthly_parquet_sensor
 
-all_assets = load_assets_from_modules([dno_lv_feeder_files])
+all_assets = load_assets_from_modules(
+    [dno_lv_feeder_files, dno_lv_feeder_monthly_parquet]
+)
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR = os.path.join(CURRENT_DIR, "..", "data")
@@ -15,29 +17,41 @@ FIXTURE_DIR = os.path.join(CURRENT_DIR, "..", "weave_tests", "fixtures")
 
 resources = {
     "dev_local": {
-        "raw_files_resource": RawFilesResource(
+        "raw_files_resource": OutputFilesResource(
             url=f"file://{os.path.join(DATA_DIR, "raw")}"
+        ),
+        "staging_files_resource": OutputFilesResource(
+            url=f"file://{os.path.join(DATA_DIR, "staging")}"
         ),
         "ssen_api_client": LiveSSENAPIClient(
             available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
         ),
     },
     "dev_cloud": {
-        "raw_files_resource": RawFilesResource(url="s3://weave.energy-dev/data/raw"),
+        "raw_files_resource": OutputFilesResource(url="s3://weave.energy-dev/data/raw"),
+        "staging_files_resource": OutputFilesResource(
+            url="s3://weave.energy-dev/data/staging"
+        ),
         "ssen_api_client": LiveSSENAPIClient(
             available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
         ),
     },
     "branch": {
-        "raw_files_resource": RawFilesResource(
+        "raw_files_resource": OutputFilesResource(
             url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/data/raw"
+        ),
+        "staging_files_resource": OutputFilesResource(
+            url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/data/staging"
         ),
         "ssen_api_client": LiveSSENAPIClient(
             available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
         ),
     },
     "prod": {
-        "raw_files_resource": RawFilesResource(url="s3://weave.energy/data/raw"),
+        "raw_files_resource": OutputFilesResource(url="s3://weave.energy/data/raw"),
+        "staging_files_resource": OutputFilesResource(
+            url="s3://weave.energy/data/staging"
+        ),
         "ssen_api_client": LiveSSENAPIClient(
             available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
         ),
@@ -74,6 +88,6 @@ def deployment_name():
 
 defs = Definitions(
     assets=all_assets,
-    sensors=[ssen_lv_feeder_files_sensor],
+    sensors=[ssen_lv_feeder_files_sensor, ssen_lv_feeder_monthly_parquet_sensor],
     resources=resources[deployment_name()],
 )
