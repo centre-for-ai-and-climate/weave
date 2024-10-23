@@ -52,7 +52,7 @@ pyarrow_csv_convert_options = pa_csv.ConvertOptions(
 
 @asset(
     description="Monthly partitioned parquet files from SSEN's raw data",
-    partitions_def=MonthlyPartitionsDefinition(start_date="2024-02-01"),
+    partitions_def=MonthlyPartitionsDefinition(start_date="2024-02-01", end_offset=1),
     deps=["ssen_lv_feeder_files"],
 )
 def ssen_lv_feeder_monthly_parquet(
