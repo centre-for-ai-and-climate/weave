@@ -568,6 +568,19 @@ wheels = [
 ]
 
 [[package]]
+name = "dagster-pandas"
+version = "0.24.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dagster" },
+    { name = "pandas" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e6/01/de4611cc6e4fdd9efc91e92bcde0843c7df5751faf9151bc9c34c8f6c62c/dagster-pandas-0.24.8.tar.gz", hash = "sha256:77ea7e131cbb57243368527dcdb802acac5433a3179b43094692ad02e40d3daa", size = 21047 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/ec/f77feab1e539e0a4bfccb49b55b3b1cb8fa6a88de5e05b8bb9656e19313d/dagster_pandas-0.24.8-py3-none-any.whl", hash = "sha256:534dcb71759f78b823790581b22fb21a636d5fb200262cf0c086175cc01af5fc", size = 24395 },
+]
+
+[[package]]
 name = "dagster-pipes"
 version = "1.8.8"
 source = { registry = "https://pypi.org/simple" }
@@ -2516,6 +2529,7 @@ source = { editable = "." }
 dependencies = [
     { name = "dagster" },
     { name = "dagster-cloud" },
+    { name = "dagster-pandas" },
     { name = "humanize" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -2538,6 +2552,7 @@ dev = [
 requires-dist = [
     { name = "dagster", specifier = ">=1.8.8" },
     { name = "dagster-cloud", specifier = ">=1.8.8" },
+    { name = "dagster-pandas", specifier = ">=0.24.8" },
     { name = "humanize", specifier = ">=4.11.0" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pyarrow", specifier = ">=17.0.0" },

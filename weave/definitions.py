@@ -2,13 +2,17 @@ import os
 
 from dagster import Definitions, load_assets_from_modules
 
-from .assets import dno_lv_feeder_files, dno_lv_feeder_monthly_parquet
+from .assets import (
+    dno_lv_feeder_files,
+    dno_lv_feeder_monthly_parquet,
+    ssen_substation_locations,
+)
 from .resources.output_files import OutputFilesResource
 from .resources.ssen import LiveSSENAPIClient
 from .sensors import ssen_lv_feeder_files_sensor, ssen_lv_feeder_monthly_parquet_sensor
 
 all_assets = load_assets_from_modules(
-    [dno_lv_feeder_files, dno_lv_feeder_monthly_parquet]
+    [dno_lv_feeder_files, dno_lv_feeder_monthly_parquet, ssen_substation_locations]
 )
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -24,7 +28,8 @@ resources = {
             url=f"file://{os.path.join(DATA_DIR, "staging")}"
         ),
         "ssen_api_client": LiveSSENAPIClient(
-            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
+            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
+            postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
         ),
     },
     "dev_cloud": {
@@ -33,7 +38,8 @@ resources = {
             url="s3://weave.energy-dev/data/staging"
         ),
         "ssen_api_client": LiveSSENAPIClient(
-            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
+            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
+            postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
         ),
     },
     "branch": {
@@ -44,7 +50,8 @@ resources = {
             url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/data/staging"
         ),
         "ssen_api_client": LiveSSENAPIClient(
-            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
+            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
+            postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
         ),
     },
     "prod": {
@@ -53,7 +60,8 @@ resources = {
             url="s3://weave.energy/data/staging"
         ),
         "ssen_api_client": LiveSSENAPIClient(
-            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
+            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
+            postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
         ),
     },
 }
