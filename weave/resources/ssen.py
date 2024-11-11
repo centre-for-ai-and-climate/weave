@@ -3,6 +3,7 @@ import zlib
 from abc import ABC, abstractmethod
 
 import humanize
+import pandas as pd
 import requests
 from dagster import AssetExecutionContext, ConfigurableResource
 from fsspec.core import OpenFile
@@ -12,9 +13,10 @@ from ..core import AvailableFile
 
 
 class SSENAPIClient(ConfigurableResource, ABC):
-    """API Client for SSEN's Smart Meter data"""
+    """API Client for SSEN's open data"""
 
     available_files_url: str
+    postcode_mapping_url: str
 
     @abstractmethod
     def get_available_files(self) -> list[AvailableFile]:
@@ -45,6 +47,12 @@ class SSENAPIClient(ConfigurableResource, ABC):
         url = response_object["downloadLink"]
         filename = self.filename_for_url(url)
         return AvailableFile(filename=filename, url=url)
+
+    def lv_feeder_postcode_lookup_dataframe(self, input_file: OpenFile) -> pd.DataFrame:
+        """Turn the LV Feeder lookup CSV file into a Pandas DataFrame."""
+        # Open as str because some columns are integer-looking but have leading zeros
+        df = pd.read_csv(input_file, compression="gzip", engine="pyarrow", dtype=str)
+        return df
 
 
 class LiveSSENAPIClient(SSENAPIClient):

@@ -2,9 +2,9 @@ import io
 import re
 import zipfile
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import humanize
-import numpy as np
 import pandas as pd
 import requests
 from dagster import AssetExecutionContext, ConfigurableResource
@@ -24,9 +24,11 @@ class ONSAPIClient(ConfigurableResource, ABC):
     def download_onspd(self, output_file: OpenFile) -> None:
         pass
 
-    def onspd_dataframe(self, input_file: OpenFile) -> pd.DataFrame:
-        """Turn the ONSPD CSV file into a DataFrame of the data we actually use, i.e.
-        postcode, latitude and longitude"""
+    def onspd_dataframe(
+        self, input_file: OpenFile, cols: list[str] = None
+    ) -> pd.DataFrame:
+        """Find the ONSPD csv file within the .zip and load it into a DataFrame."""
+        dtypes = defaultdict(lambda: "string", pcd="string", lat="float", long="float")
         with zipfile.ZipFile(io.BytesIO(input_file.read())) as z:
             filename = next(
                 filter(
@@ -39,11 +41,10 @@ class ONSAPIClient(ConfigurableResource, ABC):
                 # values for different columns
                 df = pd.read_csv(
                     f,
-                    usecols=["pcd", "lat", "long"],
-                    dtype={"pcd": str, "lat": np.float64, "long": np.float64},
+                    usecols=cols,
+                    dtype=dtypes,
                     na_values={"lat": NULL_LAT, "long": NULL_LONG},
                 )
-                df.dropna(inplace=True)
                 return df
 
     def _log_download_progress(self, context, total_size, downloaded_size):
