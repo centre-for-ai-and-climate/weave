@@ -1,6 +1,9 @@
+import io
 import json
+import zipfile
 import zlib
 from abc import ABC, abstractmethod
+from collections import defaultdict
 
 import humanize
 import pandas as pd
@@ -19,6 +22,7 @@ class SSENAPIClient(ConfigurableResource, ABC):
         "https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
     )
     postcode_mapping_url: str = "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv"
+    transformer_load_model_url: str = "https://data-api.ssen.co.uk/dataset/d1c4009b-4386-4208-a14f-cc09aeeb4777/resource/53b2b871-4c28-4ba9-85d4-c9ba6452aa15/download/onedrive_1_01-08-2024.zip"
 
     @abstractmethod
     def get_available_files(self) -> list[AvailableFile]:
@@ -59,6 +63,20 @@ class SSENAPIClient(ConfigurableResource, ABC):
         # Open as str because some columns are integer-looking but have leading zeros
         df = pd.read_csv(input_file, compression="gzip", engine="pyarrow", dtype=str)
         return df
+
+    def transformer_load_model_dataframe(
+        self, input_file: OpenFile, cols: list[str] = None
+    ) -> pd.DataFrame:
+        """Find the Transformer Load Model CSV file within the .zip and turn it into a
+        Pandas DataFrame."""
+        dtypes = defaultdict(
+            lambda: "string", full_nrn="string", latitude="float", longitude="float"
+        )
+        with zipfile.ZipFile(io.BytesIO(input_file.read())) as z_outer:
+            with z_outer.open("SEPD_transformers_open_data_with_nrn.zip") as z_inner:
+                with zipfile.ZipFile(io.BytesIO(z_inner.read())) as z_nested:
+                    with z_nested.open("SEPD_transformers_open_data_with_nrn.csv") as f:
+                        return pd.read_csv(f, usecols=cols, dtype=dtypes)
 
 
 class LiveSSENAPIClient(SSENAPIClient):

@@ -6,6 +6,9 @@ from dagster import (
     asset,
 )
 from dagster_pandas.data_frame import create_table_schema_metadata_from_dataframe
+from pyproj import Transformer
+from pyproj.transformer import TransformerGroup
+from shapely import Point
 
 from ..core import DNO
 from ..resources.ons import ONSAPIClient
@@ -154,11 +157,19 @@ def ssen_substation_location_lookup_feeder_postcodes(
         .to_crs("EPSG:4326")
     )
 
-    metadata["dagster/row_count"] = len(gdf)
-    metadata["dagster/column_schema"] = create_table_schema_metadata_from_dataframe(gdf)
+    # Turn back into a DataFrame, with a single location column that matches the
+    # lv feeder data schema (so we can add this back into the lv feeder data without
+    # needing geopandas/geoarrow etc)
+    gdf["substation_geo_location"] = gdf.geometry.apply(
+        lambda geometry: f"{geometry.x},{geometry.y}"
+    )
+    df = pd.DataFrame(gdf[["substation_nrn", "substation_geo_location"]])
+
+    metadata["dagster/row_count"] = len(df)
+    metadata["dagster/column_schema"] = create_table_schema_metadata_from_dataframe(df)
 
     with staging_files_resource.open(DNO.SSEN.value, filename, mode="wb") as output:
-        gdf.to_parquet(output, index=False)
+        df.to_parquet(output, index=False)
         metadata["dagster/uri"] = output.name
 
     return MaterializeResult(metadata=metadata)
@@ -176,4 +187,133 @@ def _add_standardised_postcode_to_dataframe(
 def _substation_nrn_from_lv_feeder_lookup(row):
     """Format the Network Reference Number for a substation from component columns
     in the LV Feeder postcode lookup file"""
-    return f"{row["primary_substation_id"]}_{row["hv_feeder_id"]}_{row["secondary_substation_id"]}"
+    primary_substation_id = row["primary_substation_id"].zfill(4)
+    hv_feeder_id = row["hv_feeder_id"].zfill(3)
+    secondary_substation_id = row["secondary_substation_id"].zfill(3)
+    return f"{primary_substation_id}{hv_feeder_id}{secondary_substation_id}"
+
+
+@asset(description="SSEN's raw Transformer Load Model file")
+def ssen_transformer_load_model(
+    context: AssetExecutionContext,
+    raw_files_resource: OutputFilesResource,
+    ssen_api_client: SSENAPIClient,
+) -> MaterializeResult:
+    metadata = {}
+    filename = "transformer_load_model.zip"
+    url = ssen_api_client.transformer_load_model_url
+    with raw_files_resource.open(DNO.SSEN.value, filename, mode="wb") as f:
+        ssen_api_client.download_file(context, url, f, gzip=False)
+
+    with raw_files_resource.open(DNO.SSEN.value, filename, mode="rb") as f:
+        df = ssen_api_client.transformer_load_model_dataframe(f)
+        metadata["dagster/uri"] = f.name
+        metadata["dagster/row_count"] = len(df)
+        metadata["dagster/column_schema"] = create_table_schema_metadata_from_dataframe(
+            df
+        )
+        metadata["weave/source"] = url
+        metadata["weave/nunique_substations"] = df["full_nrn"].nunique()
+        metadata["weave/number_of_na_locations"] = len(
+            df[df.latitude.isna() | df.longitude.isna()]
+        )
+    return MaterializeResult(metadata=metadata)
+
+
+@asset(
+    description="SSEN substation lookup table, built from their Transformer Load Model",
+    deps=[ssen_transformer_load_model],
+)
+def ssen_substation_location_lookup_transformer_load_model(
+    context: AssetExecutionContext,
+    raw_files_resource: OutputFilesResource,
+    staging_files_resource: OutputFilesResource,
+    ssen_api_client: SSENAPIClient,
+) -> MaterializeResult:
+    metadata = {}
+    filename = "substation_location_lookup_transformer_load_model.parquet"
+    gdf = None
+    with raw_files_resource.open(
+        DNO.SSEN.value, "transformer_load_model.zip", mode="rb"
+    ) as f:
+        df = ssen_api_client.transformer_load_model_dataframe(
+            f, cols=["full_nrn", "latitude", "longitude"]
+        )
+        # The load model contains forecasts for various years and scenarios for the same
+        # substation but the locations are the same throughout, so we can dedupe
+        df = df.drop_duplicates(subset=["full_nrn"])
+        # Some have no location, which is no use to us
+        df = df.dropna(subset=["latitude", "longitude"])
+        gdf = gpd.GeoDataFrame(
+            df, geometry=gpd.points_from_xy(df.longitude, df.latitude), crs="EPSG:4326"
+        )
+        gdf = gdf.drop(columns=["latitude", "longitude"])
+        gdf = gdf.rename(columns={"full_nrn": "substation_nrn"})
+        # Match the nrn format in lv feeder data
+        gdf["substation_nrn"] = gdf.apply(
+            _substation_nrn_from_transformer_load_model, axis=1
+        )
+        gdf = _fix_bng_grid_shift(gdf)
+        # Output location in the same format as the lv feeder data
+        gdf["substation_geo_location"] = gdf.geometry.apply(
+            lambda geometry: f"{geometry.x},{geometry.y}"
+        )
+        df = pd.DataFrame(gdf[["substation_nrn", "substation_geo_location"]])
+
+        metadata["dagster/row_count"] = len(df)
+        metadata["dagster/column_schema"] = create_table_schema_metadata_from_dataframe(
+            df
+        )
+        metadata["weave/nunique_substations"] = df["substation_nrn"].nunique()
+
+    with staging_files_resource.open(DNO.SSEN.value, filename, mode="wb") as output:
+        df.to_parquet(output, index=False)
+        metadata["dagster/uri"] = output.name
+
+    return MaterializeResult(metadata=metadata)
+
+
+def _substation_nrn_from_transformer_load_model(row):
+    """The full NRNs in the Transformer Load Model do not always match the format in the
+    LV feeder data, so we need to reformat them"""
+    components = row["substation_nrn"].split("_")
+    assert len(components) == 3, f"Unexpected NRN format: {row['substation_nrn']}"
+
+    primary_substation_id = components[0].zfill(4)
+    hv_feeder_id = components[1].zfill(3)
+    secondary_substation_id = components[2].zfill(3)
+
+    return f"{primary_substation_id}{hv_feeder_id}{secondary_substation_id}"
+
+
+def _fix_bng_grid_shift(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Fixes Point geometries that have been badly converted from BNG to WGS84 without
+    the necessary grid shift file."""
+    # See ADR 0003 for more information on why we're doing this.
+    # Force installation of the OSNT15 grid shift file so we can definitely do accurate
+    # conversions
+    tg = TransformerGroup("EPSG:27700", "EPSG:4326")
+    if not tg.best_available:
+        tg.download_grids()
+        tg = TransformerGroup("EPSG:27700", "EPSG:4326")
+        assert tg.best_available
+
+    # Create the transformers we need from explicit proj pipeline strings so that we're
+    # sure we're using (or not using) the correct grid shift file
+    bad_transformer = Transformer.from_pipeline(
+        "proj=pipeline step proj=axisswap order=2,1 step proj=unitconvert xy_in=deg xy_out=rad step proj=tmerc lat_0=49 lon_0=-2 k=0.9996012717 x_0=400000 y_0=-100000 ellps=airy"
+    )
+    good_transformer = Transformer.from_pipeline(
+        "proj=pipeline step inv proj=tmerc lat_0=49 lon_0=-2 k=0.9996012717 x_0=400000 y_0=-100000 ellps=airy step proj=hgridshift grids=uk_os_OSTN15_NTv2_OSGBtoETRS.tif step proj=unitconvert xy_in=rad xy_out=deg step proj=axisswap order=2,1"
+    )
+
+    def fix_ssen_transforms(point):
+        # Make sure we're messing with the Geometry types we expect
+        assert isinstance(point, Point)
+        # Note the y, x (lat, lon) order here - pyproj transformers respect the CRS' order
+        easting, northing = bad_transformer.transform(point.y, point.x)
+        x, y = good_transformer.transform(easting, northing)
+        return Point(y, x)
+
+    gdf["geometry"] = gdf.geometry.apply(fix_ssen_transforms)
+    return gdf
