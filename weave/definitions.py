@@ -29,26 +29,16 @@ resources = {
         "staging_files_resource": OutputFilesResource(
             url=f"file://{os.path.join(DATA_DIR, "staging")}"
         ),
-        "ssen_api_client": LiveSSENAPIClient(
-            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
-            postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
-        ),
-        "ons_api_client": LiveONSAPIClient(
-            onspd_url="https://www.arcgis.com/sharing/rest/content/items/265778cd85754b7e97f404a1c63aea04/data"
-        ),
+        "ssen_api_client": LiveSSENAPIClient(),
+        "ons_api_client": LiveONSAPIClient(),
     },
     "dev_cloud": {
         "raw_files_resource": OutputFilesResource(url="s3://weave.energy-dev/data/raw"),
         "staging_files_resource": OutputFilesResource(
             url="s3://weave.energy-dev/data/staging"
         ),
-        "ssen_api_client": LiveSSENAPIClient(
-            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
-            postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
-        ),
-        "ons_api_client": LiveONSAPIClient(
-            onspd_url="https://www.arcgis.com/sharing/rest/content/items/265778cd85754b7e97f404a1c63aea04/data"
-        ),
+        "ssen_api_client": LiveSSENAPIClient(),
+        "ons_api_client": LiveONSAPIClient(),
     },
     "branch": {
         "raw_files_resource": OutputFilesResource(
@@ -57,26 +47,16 @@ resources = {
         "staging_files_resource": OutputFilesResource(
             url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/data/staging"
         ),
-        "ssen_api_client": LiveSSENAPIClient(
-            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
-            postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
-        ),
-        "ons_api_client": LiveONSAPIClient(
-            onspd_url="https://www.arcgis.com/sharing/rest/content/items/265778cd85754b7e97f404a1c63aea04/data"
-        ),
+        "ssen_api_client": LiveSSENAPIClient(),
+        "ons_api_client": LiveONSAPIClient(),
     },
     "prod": {
         "raw_files_resource": OutputFilesResource(url="s3://weave.energy/data/raw"),
         "staging_files_resource": OutputFilesResource(
             url="s3://weave.energy/data/staging"
         ),
-        "ssen_api_client": LiveSSENAPIClient(
-            available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
-            postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
-        ),
-        "ons_api_client": LiveONSAPIClient(
-            onspd_url="https://www.arcgis.com/sharing/rest/content/items/265778cd85754b7e97f404a1c63aea04/data"
-        ),
+        "ssen_api_client": LiveSSENAPIClient(),
+        "ons_api_client": LiveONSAPIClient(),
     },
 }
 

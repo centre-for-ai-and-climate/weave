@@ -15,8 +15,10 @@ from ..core import AvailableFile
 class SSENAPIClient(ConfigurableResource, ABC):
     """API Client for SSEN's open data"""
 
-    available_files_url: str
-    postcode_mapping_url: str
+    available_files_url: str = (
+        "https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
+    )
+    postcode_mapping_url: str = "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv"
 
     @abstractmethod
     def get_available_files(self) -> list[AvailableFile]:

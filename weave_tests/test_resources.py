@@ -29,10 +29,7 @@ def ssen_csv_response():
 
 @pytest.fixture
 def ssen_api_client():
-    return LiveSSENAPIClient(
-        available_files_url="https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/",
-        postcode_mapping_url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv",
-    )
+    return LiveSSENAPIClient()
 
 
 class TestLiveSSENAPIClient:

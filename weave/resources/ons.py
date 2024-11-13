@@ -18,7 +18,7 @@ NULL_LONG = "0.000000"
 class ONSAPIClient(ConfigurableResource, ABC):
     """API Client for ONS data"""
 
-    onspd_url: str
+    onspd_url: str = "https://www.arcgis.com/sharing/rest/content/items/265778cd85754b7e97f404a1c63aea04/data"
 
     @abstractmethod
     def download_onspd(self, output_file: OpenFile) -> None:
