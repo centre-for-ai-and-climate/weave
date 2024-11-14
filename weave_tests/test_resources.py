@@ -7,6 +7,7 @@ import responses
 from dagster import build_asset_context
 
 from weave.core import AvailableFile
+from weave.resources.ons import LiveONSAPIClient
 from weave.resources.ssen import LiveSSENAPIClient
 
 FIXTURE_DIR = os.path.join(
@@ -30,6 +31,17 @@ def ssen_csv_response():
 @pytest.fixture
 def ssen_api_client():
     return LiveSSENAPIClient()
+
+
+@pytest.fixture
+def ons_api_client():
+    return LiveONSAPIClient()
+
+
+@pytest.fixture
+def onspd_response():
+    with open(os.path.join(FIXTURE_DIR, "onspd.zip"), "rb") as f:
+        yield f.read()
 
 
 class TestLiveSSENAPIClient:
@@ -70,3 +82,41 @@ class TestLiveSSENAPIClient:
             # Using Pandas to read the gzipped CSV file to ensure it's valid
             df = pd.read_csv(downloaded_file)
             assert len(df) == 10
+
+
+class TestLiveONSClient:
+    def test_download_onspd(self, tmp_path, ons_api_client, onspd_response):
+        downloaded_file = (tmp_path / "onspd.zip").as_uri()
+        context = build_asset_context()
+        with responses.RequestsMock() as mocked_responses:
+            mocked_responses.get(
+                "https://www.arcgis.com/sharing/rest/content/items/265778cd85754b7e97f404a1c63aea04/data",
+                body=onspd_response,
+                status=200,
+            )
+            with fsspec.open(downloaded_file, "wb") as f:
+                ons_api_client.download_onspd(context=context, output_file=f)
+
+            with fsspec.open(downloaded_file, "rb") as f:
+                df = ons_api_client.onspd_dataframe(f)
+                assert len(df) == 9
+
+    def test_onspd_dataframe(self, ons_api_client):
+        with open(os.path.join(FIXTURE_DIR, "onspd.zip"), "rb") as f:
+            df = ons_api_client.onspd_dataframe(f, cols=["pcd", "lat", "long"])
+            assert len(df) == 9
+            assert list(df.columns) == [
+                "pcd",
+                "lat",
+                "long",
+            ], "should only parse specified columns"
+            assert df["pcd"].dtype == "string", "pcd should be string"
+            assert df["lat"].dtype == "float", "lat should be float"
+            assert df["long"].dtype == "float", "long should be float"
+            df.set_index("pcd", inplace=True)
+            assert pd.isna(
+                df.loc["AB1 0AN"].lat
+            ), "99.999999 lats should be parsed as NaN"
+            assert pd.isna(
+                df.loc["AB1 0AN"].long
+            ), "0.000000 longs should parsed as NaN"
