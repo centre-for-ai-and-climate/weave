@@ -61,7 +61,9 @@ class SSENAPIClient(ConfigurableResource, ABC):
     def lv_feeder_postcode_lookup_dataframe(self, input_file: OpenFile) -> pd.DataFrame:
         """Turn the LV Feeder lookup CSV file into a Pandas DataFrame."""
         # Open as str because some columns are integer-looking but have leading zeros
-        df = pd.read_csv(input_file, compression="gzip", engine="pyarrow", dtype=str)
+        df = pd.read_csv(
+            input_file, compression="gzip", engine="pyarrow", dtype="string"
+        )
         return df
 
     def transformer_load_model_dataframe(

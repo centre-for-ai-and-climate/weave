@@ -64,7 +64,7 @@ class TestLiveSSENAPIClient:
                 url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-09-27.csv",
             )
 
-    def test_download_file(self, tmp_path, ssen_api_client, ssen_csv_response):
+    def test_download_file_gzip(self, tmp_path, ssen_api_client, ssen_csv_response):
         downloaded_file = (tmp_path / "downloaded.csv.gz").as_uri()
         context = build_asset_context()
         with responses.RequestsMock() as mocked_responses:
@@ -82,6 +82,48 @@ class TestLiveSSENAPIClient:
             # Using Pandas to read the gzipped CSV file to ensure it's valid
             df = pd.read_csv(downloaded_file)
             assert len(df) == 10
+
+    def test_download_file_no_gzip(self, tmp_path, ssen_api_client, ssen_csv_response):
+        downloaded_file = (tmp_path / "downloaded.csv").as_uri()
+        context = build_asset_context()
+        with responses.RequestsMock() as mocked_responses:
+            mocked_responses.get(
+                "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-02-12.csv",
+                body=ssen_csv_response,
+                status=200,
+            )
+            with fsspec.open(downloaded_file, "wb") as f:
+                ssen_api_client.download_file(
+                    context=context,
+                    url="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-02-12.csv",
+                    output_file=f,
+                    gzip=False,
+                )
+            # Using Pandas to read the gzipped CSV file to ensure it's valid
+            df = pd.read_csv(downloaded_file)
+            assert len(df) == 10
+
+    def test_lv_feeder_postcode_lookup_dataframe(self, ssen_api_client):
+        input_file = os.path.join(FIXTURE_DIR, "ssen_lv_feeder_postcode_mapping.csv.gz")
+        df = ssen_api_client.lv_feeder_postcode_lookup_dataframe(input_file)
+        assert len(df) == 9
+        assert df["dataset_id"].dtype == "string", "dataset_id should be string"
+
+    def test_transformer_load_model_dataframe(self, ssen_api_client):
+        input_file = os.path.join(FIXTURE_DIR, "ssen_transformer_load_model.zip")
+        with open(input_file, "rb") as f:
+            df = ssen_api_client.transformer_load_model_dataframe(
+                f, cols=["full_nrn", "latitude", "longitude"]
+            )
+            assert len(df) == 10
+            assert list(df.columns) == [
+                "full_nrn",
+                "latitude",
+                "longitude",
+            ], "should only parse specified columns"
+            assert df["full_nrn"].dtype == "string", "full_nrn should be string"
+            assert df["latitude"].dtype == "float", "latitude should be float"
+            assert df["longitude"].dtype == "float", "longitude should be float"
 
 
 class TestLiveONSClient:
