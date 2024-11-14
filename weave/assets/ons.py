@@ -12,9 +12,10 @@ def onspd(
     raw_files_resource: OutputFilesResource,
 ) -> MaterializeResult:
     metadata = {}
-    with raw_files_resource.open("ons", "onspd.zip", mode="wb") as f:
+    filename = "onspd.zip"
+    with raw_files_resource.open("ons", filename, mode="wb") as f:
         ons_api_client.download_onspd(f, context)
-        metadata["dagster/uri"] = f.name
+        metadata["dagster/uri"] = raw_files_resource.path("ons", filename)
         metadata["weave/source"] = ons_api_client.onspd_url
 
     with raw_files_resource.open("ons", "onspd.zip", mode="rb") as f:

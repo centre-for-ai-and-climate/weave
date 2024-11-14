@@ -31,7 +31,7 @@ def ssen_lv_feeder_postcode_mapping(
     metadata = {}
     with raw_files_resource.open(DNO.SSEN.value, filename, mode="rb") as f:
         df = pd.read_csv(f, compression="gzip", engine="pyarrow")
-        metadata["dagster/uri"] = f.name
+        metadata["dagster/uri"] = raw_files_resource.path(DNO.SSEN.value, filename)
         metadata["dagster/row_count"] = len(df)
         metadata["dagster/column_schema"] = create_table_schema_metadata_from_dataframe(
             df
@@ -170,7 +170,7 @@ def ssen_substation_location_lookup_feeder_postcodes(
 
     with staging_files_resource.open(DNO.SSEN.value, filename, mode="wb") as output:
         df.to_parquet(output, index=False)
-        metadata["dagster/uri"] = output.name
+        metadata["dagster/uri"] = staging_files_resource.path(DNO.SSEN.value, filename)
 
     return MaterializeResult(metadata=metadata)
 
@@ -207,7 +207,7 @@ def ssen_transformer_load_model(
 
     with raw_files_resource.open(DNO.SSEN.value, filename, mode="rb") as f:
         df = ssen_api_client.transformer_load_model_dataframe(f)
-        metadata["dagster/uri"] = f.name
+        metadata["dagster/uri"] = raw_files_resource.path(DNO.SSEN.value, filename)
         metadata["dagster/row_count"] = len(df)
         metadata["dagster/column_schema"] = create_table_schema_metadata_from_dataframe(
             df
@@ -268,7 +268,7 @@ def ssen_substation_location_lookup_transformer_load_model(
 
     with staging_files_resource.open(DNO.SSEN.value, filename, mode="wb") as output:
         df.to_parquet(output, index=False)
-        metadata["dagster/uri"] = output.name
+        metadata["dagster/uri"] = staging_files_resource.path(DNO.SSEN.value, filename)
 
     return MaterializeResult(metadata=metadata)
 

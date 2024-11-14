@@ -8,4 +8,7 @@ class OutputFilesResource(ConfigurableResource):
     url: str
 
     def open(self, dno, filename, **open_kwargs):
-        return fsspec.open(f"{self.url}/{dno}/{filename}", **open_kwargs)
+        return fsspec.open(self.path(dno, filename), **open_kwargs)
+
+    def path(self, dno, filename):
+        return f"{self.url}/{dno}/{filename}"
