@@ -15,6 +15,7 @@ dependencies = [
     "s3fs>=2024.9.0",
     "humanize>=4.11.0",
     "dagster-pandas>=0.24.8",
+    "geopandas>=1.0.1",
 ]
 
 [build-system]
@@ -33,7 +34,6 @@ dev-dependencies = [
     "contextily>=1.6.2",
     "dagster-webserver>=1.8.8",
     "folium>=0.18.0",
-    "geopandas>=1.0.1",
     "jupyter>=1.1.1",
     "mapclassify>=2.8.1",
     "matplotlib>=3.9.2",
