@@ -1,3 +1,6 @@
+import sys
+from io import StringIO
+
 import geopandas as gpd
 import pandas as pd
 from dagster import (
@@ -253,7 +256,7 @@ def ssen_substation_location_lookup_transformer_load_model(
         gdf["substation_nrn"] = gdf.apply(
             _substation_nrn_from_transformer_load_model, axis=1
         )
-        gdf = _fix_bng_grid_shift(gdf)
+        gdf = _fix_bng_grid_shift(gdf, context)
         # Output location in the same format as the lv feeder data
         gdf["substation_geo_location"] = gdf.geometry.apply(
             lambda geometry: f"{geometry.x},{geometry.y}"
@@ -286,7 +289,9 @@ def _substation_nrn_from_transformer_load_model(row):
     return f"{primary_substation_id}{hv_feeder_id}{secondary_substation_id}"
 
 
-def _fix_bng_grid_shift(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+def _fix_bng_grid_shift(
+    gdf: gpd.GeoDataFrame, context: AssetExecutionContext
+) -> gpd.GeoDataFrame:
     """Fixes Point geometries that have been badly converted from BNG to WGS84 without
     the necessary grid shift file."""
     # See ADR 0003 for more information on why we're doing this.
@@ -294,9 +299,18 @@ def _fix_bng_grid_shift(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     # conversions
     tg = TransformerGroup("EPSG:27700", "EPSG:4326")
     if not tg.best_available:
-        tg.download_grids()
+        context.log.info("OSTN15 grid shift file not installed, downloading...")
+        # Capture stdout and log it to the context
+        old_stdout = sys.stdout
+        sys.stdout = mystdout = StringIO()
+        tg.download_grids(verbose=True)
+        context.log.info(mystdout.getvalue())
+        sys.stdout = old_stdout
+        context.log.info("OSTN15 grid shift file should be downloaded now")
         tg = TransformerGroup("EPSG:27700", "EPSG:4326")
-        assert tg.best_available
+        assert (
+            tg.best_available
+        ), "Should have sucessfully downloaded the grid shift file"
 
     # Create the transformers we need from explicit proj pipeline strings so that we're
     # sure we're using (or not using) the correct grid shift file
