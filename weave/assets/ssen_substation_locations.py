@@ -1,8 +1,6 @@
-import sys
-from io import StringIO
-
 import geopandas as gpd
 import pandas as pd
+import pyproj
 from dagster import (
     AssetExecutionContext,
     MaterializeResult,
@@ -297,15 +295,11 @@ def _fix_bng_grid_shift(
     # See ADR 0003 for more information on why we're doing this.
     # Force installation of the OSNT15 grid shift file so we can definitely do accurate
     # conversions
+    pyproj.network.set_network_enabled(True)
     tg = TransformerGroup("EPSG:27700", "EPSG:4326")
     if not tg.best_available:
         context.log.info("OSTN15 grid shift file not installed, downloading...")
-        # Capture stdout and log it to the context
-        old_stdout = sys.stdout
-        sys.stdout = mystdout = StringIO()
         tg.download_grids(verbose=True)
-        context.log.info(mystdout.getvalue())
-        sys.stdout = old_stdout
         context.log.info("OSTN15 grid shift file should be downloaded now")
         tg = TransformerGroup("EPSG:27700", "EPSG:4326")
         assert (
