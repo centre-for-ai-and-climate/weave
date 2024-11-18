@@ -21,7 +21,9 @@ class ONSAPIClient(ConfigurableResource, ABC):
     onspd_url: str = "https://www.arcgis.com/sharing/rest/content/items/265778cd85754b7e97f404a1c63aea04/data"
 
     @abstractmethod
-    def download_onspd(self, output_file: OpenFile) -> None:
+    def download_onspd(
+        self, output_file: OpenFile, context: AssetExecutionContext
+    ) -> None:
         pass
 
     def onspd_dataframe(
@@ -73,3 +75,13 @@ class LiveONSAPIClient(ONSAPIClient):
             context.log.info(
                 f"Downloaded {self.onspd_url} - total size: {humanize.naturalsize(total_size)}"
             )
+
+
+class StubONSAPIClient(ONSAPIClient):
+    file_to_download: str | None
+
+    def download_onspd(
+        self, output_file: OpenFile, context: AssetExecutionContext
+    ) -> None:
+        with open(self.file_to_download, "rb") as f:
+            output_file.write(f.read())
