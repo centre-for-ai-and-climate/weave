@@ -74,26 +74,8 @@ def ssen_substation_location_lookup_feeder_postcodes(
 
     # Standardise the postcodes and add substation ids, so we can match them
     df = _add_standardised_postcode_to_dataframe(df, postcode_column="postcode")
-
-    metadata["weave/invalid_feeder_postcodes"] = len(
-        df[
-            df["standardised_postcode"].isna()
-            | (df["standardised_postcode"].str.len() < 5)
-        ]
-    )
-
-    # Drop rows which are clearly invalid, or at least unusable for our purposes
-    # Doesn't get rid of every invalid postcode, but 5 is the shortest valid UK postcode so
-    # it's on the safe side.
-    df = df.drop(
-        df[
-            df["standardised_postcode"].isna()
-            | (df["standardised_postcode"].str.len() < 5)
-        ].index,
-    )
-
+    df, metadata = _filter_invalid_postcodes(df, "standardised_postcode")
     df["substation_nrn"] = df.apply(_substation_nrn_from_lv_feeder_lookup, axis=1)
-
     df = df[["standardised_postcode", "substation_nrn"]]
 
     onspd_df = _add_standardised_postcode_to_dataframe(onspd_df, postcode_column="pcd")
@@ -101,76 +83,10 @@ def ssen_substation_location_lookup_feeder_postcodes(
 
     # Merge the two together
     df = df.merge(onspd_df, on="standardised_postcode", how="left")
+    df, metadata = _filter_missing_locations(df, metadata)
 
-    metadata["weave/unmatched_feeder_postcodes"] = df[
-        df["lat"].isna()
-    ].standardised_postcode.nunique()
-
-    df = df.dropna(subset=["lat", "long"])
-
-    # Make it geographical, so we can do some geo-filtering
-    gdf = (
-        gpd.GeoDataFrame(
-            df, geometry=gpd.points_from_xy(df.long, df.lat), crs="EPSG:4326"
-        )
-        # Group by substation NRN
-        .dissolve("substation_nrn")
-        # Combine all the points into one geometry
-        .convex_hull
-        # GeoPandas does some weirdness when we do this, so get back to a normal
-        # GeoDataFrame with the convex hull as the geometry
-        .reset_index()
-        .rename(columns={0: "geometry"})
-        .set_geometry("geometry")
-        # We want to filter out bad substations using measurements in meters, so we need
-        # a CRS that can do that - OSGB36/British National Grid/EPSG:27700 is ideal.
-        .to_crs("EPSG:27700")
-    )
-
-    metadata["weave/nunique_substations"] = len(gdf)
-    metadata["weave/single_point_locations"] = len(gdf[gdf.geometry.type == "Point"])
-    metadata["weave/line_locations"] = len(gdf[gdf.geometry.type == "LineString"])
-    metadata["weave/polygon_locations"] = len(gdf[gdf.geometry.type == "Polygon"])
-    metadata["weave/excluded_lines"] = len(
-        gdf[(gdf.geometry.type == "LineString") & (gdf.geometry.length > 100)]
-    )
-    metadata["weave/excluded_polygons"] = len(
-        gdf[
-            (gdf.geometry.type == "Polygon")
-            & (gdf.geometry.area > 10000)
-            & (gdf.geometry.length / gdf.geometry.count_coordinates() > 100)
-        ]
-    )
-
-    # Filter out locations we can't really trust because they cover too broad an area
-    # to be useful for a centroid-based location
-    gdf = gdf[
-        (gdf.geometry.type == "Point")
-        | ((gdf.geometry.type == "LineString") & (gdf.geometry.length <= 100))
-        | (
-            (gdf.geometry.type == "Polygon")
-            & (gdf.geometry.area <= 10000)
-            & (gdf.geometry.length / gdf.geometry.count_coordinates() <= 100)
-        )
-    ]
-
-    # Create our output lookup table, which uses the centroid of the geometry as the
-    # location of the substation and is in a more useful CRS for downstream users
-    gdf["centroid"] = gdf.geometry.centroid
-    gdf = (
-        gdf[["substation_nrn", "centroid"]]
-        .rename(columns={"centroid": "geometry"})
-        .set_geometry("geometry")
-        .to_crs("EPSG:4326")
-    )
-
-    # Turn back into a DataFrame, with a single location column that matches the
-    # lv feeder data schema (so we can add this back into the lv feeder data without
-    # needing geopandas/geoarrow etc)
-    gdf["substation_geo_location"] = gdf.geometry.apply(
-        lambda geometry: f"{geometry.x},{geometry.y}"
-    )
-    df = pd.DataFrame(gdf[["substation_nrn", "substation_geo_location"]])
+    # Turn feeder locations into substation locations
+    df, metadata = _centroid_substation_locations(df, metadata)
 
     metadata["dagster/row_count"] = len(df)
     metadata["dagster/column_schema"] = create_table_schema_metadata_from_dataframe(df)
@@ -191,6 +107,33 @@ def _add_standardised_postcode_to_dataframe(
     return df
 
 
+def _filter_invalid_postcodes(
+    df: pd.DataFrame, postcode_column: str, metadata: dict
+) -> tuple[pd.DataFrame, dict]:
+    """Drop rows which are clearly invalid, or at least unusable for our purposes of
+    postcode matching. Doesn't get rid of every invalid postcode, but 5 is the shortest
+    valid UK postcode so it's on the safe side."""
+    metadata["weave/invalid_feeder_postcodes"] = len(
+        df[df[postcode_column].isna() | (df[postcode_column].str.len() < 5)]
+    )
+    df = df.drop(
+        df[df[postcode_column].isna() | (df[postcode_column].str.len() < 5)].index,
+    )
+    return (df, metadata)
+
+
+def _filter_missing_locations(
+    df: pd.DataFrame, metadata: dict
+) -> tuple[pd.DataFrame, dict]:
+    """Drop rows which don't have lat/lng, thanks to no matching postcode in the ONSPD
+    data"""
+    metadata["weave/unmatched_feeder_postcodes"] = df[
+        df["lat"].isna() | df["long"].isna()
+    ].standardised_postcode.nunique()
+    df = df.dropna(subset=["lat", "long"])
+    return (df, metadata)
+
+
 def _substation_nrn_from_lv_feeder_lookup(row):
     """Format the Network Reference Number for a substation from component columns
     in the LV Feeder postcode lookup file"""
@@ -198,6 +141,100 @@ def _substation_nrn_from_lv_feeder_lookup(row):
     hv_feeder_id = row["hv_feeder_id"].zfill(3)
     secondary_substation_id = row["secondary_substation_id"].zfill(3)
     return f"{primary_substation_id}{hv_feeder_id}{secondary_substation_id}"
+
+
+def _centroid_substation_locations(
+    df: pd.DataFrame, metadata: dict
+) -> tuple[pd.DataFrame, dict]:
+    """Convert a DataFrame of feeder locations into a GeoDataFrame of substation
+    locations in the "lat,long" string format used in the lv feeder data.
+
+    Groups individual rows by substation NRN, then finds the centroid of the convex hull
+    of the individual point(s).
+
+    Excludes groups of points that are too far apart for a centroid to be a useful
+    location approximation."""
+    gdf = (
+        gpd.GeoDataFrame(
+            df, geometry=gpd.points_from_xy(df.long, df.lat), crs="EPSG:4326"
+        )
+        # Group by substation NRN
+        .dissolve("substation_nrn")
+        # Combine all the points into one geometry
+        .convex_hull
+        # GeoPandas does some weirdness when we do this, so get back to a normal
+        # GeoDataFrame with the convex hull as the geometry
+        .reset_index()
+        .rename(columns={0: "geometry"})
+        .set_geometry("geometry")
+        # We want to filter out bad substations using measurements in meters, so we need
+        # a CRS that can do that - OSGB36/British National Grid/EPSG:27700 is ideal.
+        .to_crs("EPSG:27700")
+    )
+
+    gdf, metadata = _filter_unlikely_substation_areas(gdf, metadata)
+
+    # Create our output lookup table, which uses the centroid of the geometry as the
+    # location of the substation and is in a more useful CRS for downstream users
+    gdf["centroid"] = gdf.geometry.centroid
+    gdf = (
+        gdf[["substation_nrn", "centroid"]]
+        .rename(columns={"centroid": "geometry"})
+        .set_geometry("geometry")
+        .to_crs("EPSG:4326")
+    )
+
+    df = _gdf_to_df_with_substation_geo_location(gdf)
+
+    return (df, metadata)
+
+
+def _filter_unlikely_substation_areas(
+    gdf: gpd.GeoDataFrame, metadata: dict
+) -> tuple[gpd.GeoDataFrame, dict]:
+    metadata["weave/nunique_substations"] = len(gdf)
+    metadata["weave/single_point_locations"] = len(gdf[gdf.geometry.type == "Point"])
+    metadata["weave/line_locations"] = len(gdf[gdf.geometry.type == "LineString"])
+    metadata["weave/polygon_locations"] = len(gdf[gdf.geometry.type == "Polygon"])
+    metadata["weave/excluded_lines"] = len(
+        gdf[(gdf.geometry.type == "LineString") & (gdf.geometry.length > 100)]
+    )
+    metadata["weave/excluded_polygons"] = len(
+        gdf[
+            ((gdf.geometry.type == "LineString") & (gdf.geometry.length <= 100))
+            | (
+                (gdf.geometry.type == "Polygon")
+                & (gdf.geometry.area > 10000)
+                & (gdf.geometry.length / gdf.geometry.count_coordinates() > 100)
+            )
+        ]
+    )
+
+    # Filter out locations we can't really trust because they cover too broad an area
+    # to be useful for a centroid-based location
+    gdf = gdf[
+        (gdf.geometry.type == "Point")
+        | ((gdf.geometry.type == "LineString") & (gdf.geometry.length <= 100))
+        | (
+            (gdf.geometry.type == "Polygon")
+            & (gdf.geometry.area <= 10000)
+            & (gdf.geometry.length / gdf.geometry.count_coordinates() <= 100)
+        )
+    ]
+
+    return (gdf, metadata)
+
+
+def _gdf_to_df_with_substation_geo_location(gdf: gpd.GeoDataFrame) -> pd.DataFrame:
+    """Convert a GeoDataFrame with point geometry column into a DataFrame with a
+    'substation_geo_location' string lat,lng column, like the lv feeder data schema, for
+    easier downstream use without GeoPandas."""
+
+    gdf["substation_geo_location"] = gdf.geometry.apply(
+        lambda geometry: f"{geometry.x},{geometry.y}"
+    )
+
+    return pd.DataFrame(gdf[["substation_nrn", "substation_geo_location"]])
 
 
 @asset(description="SSEN's raw Transformer Load Model file")
@@ -260,12 +297,9 @@ def ssen_substation_location_lookup_transformer_load_model(
         gdf["substation_nrn"] = gdf.apply(
             _substation_nrn_from_transformer_load_model, axis=1
         )
-        gdf = _fix_bng_grid_shift(gdf, context)
+        gdf = _fix_bng_grid_shift(gdf)
         # Output location in the same format as the lv feeder data
-        gdf["substation_geo_location"] = gdf.geometry.apply(
-            lambda geometry: f"{geometry.x},{geometry.y}"
-        )
-        df = pd.DataFrame(gdf[["substation_nrn", "substation_geo_location"]])
+        df = _gdf_to_df_with_substation_geo_location(gdf)
 
         metadata["dagster/row_count"] = len(df)
         metadata["dagster/column_schema"] = create_table_schema_metadata_from_dataframe(
