@@ -17,6 +17,12 @@ from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
 from .ons import onspd
 
+# Allow pyproj to download grid shift files from their CDN for more accurate conversions
+# See ADR 0003 for more information on why we're doing this.
+pyproj.network.set_network_enabled(True)
+tg = TransformerGroup("EPSG:27700", "EPSG:4326")
+assert tg.best_available, "PyProj could not get the OSNT15 grid shift file for OSGB36 -> WGS84 conversion, this is essential for accurate location conversion"
+
 
 @asset(description="SSEN's raw LV Feeder -> Postcode mapping file")
 def ssen_lv_feeder_postcode_mapping(
@@ -287,25 +293,9 @@ def _substation_nrn_from_transformer_load_model(row):
     return f"{primary_substation_id}{hv_feeder_id}{secondary_substation_id}"
 
 
-def _fix_bng_grid_shift(
-    gdf: gpd.GeoDataFrame, context: AssetExecutionContext
-) -> gpd.GeoDataFrame:
+def _fix_bng_grid_shift(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Fixes Point geometries that have been badly converted from BNG to WGS84 without
     the necessary grid shift file."""
-    # See ADR 0003 for more information on why we're doing this.
-    # Force installation of the OSNT15 grid shift file so we can definitely do accurate
-    # conversions
-    pyproj.network.set_network_enabled(True)
-    tg = TransformerGroup("EPSG:27700", "EPSG:4326")
-    if not tg.best_available:
-        context.log.info("OSTN15 grid shift file not installed, downloading...")
-        tg.download_grids(verbose=True)
-        context.log.info("OSTN15 grid shift file should be downloaded now")
-        tg = TransformerGroup("EPSG:27700", "EPSG:4326")
-        assert (
-            tg.best_available
-        ), "Should have sucessfully downloaded the grid shift file"
-
     # Create the transformers we need from explicit proj pipeline strings so that we're
     # sure we're using (or not using) the correct grid shift file
     bad_transformer = Transformer.from_pipeline(
