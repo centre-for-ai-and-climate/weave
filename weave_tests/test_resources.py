@@ -18,13 +18,15 @@ FIXTURE_DIR = os.path.join(
 
 @pytest.fixture
 def ssen_files_response():
-    with open(os.path.join(FIXTURE_DIR, "ssen_files.json")) as f:
+    with open(os.path.join(FIXTURE_DIR, "ssen", "available_files.json")) as f:
         yield f.read()
 
 
 @pytest.fixture
 def ssen_csv_response():
-    with open(os.path.join(FIXTURE_DIR, "ssen_2024-02-12_head.csv")) as f:
+    with open(
+        os.path.join(FIXTURE_DIR, "ssen", "lv_feeder_files", "2024-02-12_head.csv")
+    ) as f:
         yield f.read()
 
 
@@ -104,13 +106,15 @@ class TestLiveSSENAPIClient:
             assert len(df) == 10
 
     def test_lv_feeder_postcode_lookup_dataframe(self, ssen_api_client):
-        input_file = os.path.join(FIXTURE_DIR, "ssen_lv_feeder_postcode_mapping.csv.gz")
+        input_file = os.path.join(
+            FIXTURE_DIR, "ssen", "lv_feeder_postcode_mapping.csv.gz"
+        )
         df = ssen_api_client.lv_feeder_postcode_lookup_dataframe(input_file)
         assert len(df) == 9
         assert df["dataset_id"].dtype == "string", "dataset_id should be string"
 
     def test_transformer_load_model_dataframe(self, ssen_api_client):
-        input_file = os.path.join(FIXTURE_DIR, "ssen_transformer_load_model.zip")
+        input_file = os.path.join(FIXTURE_DIR, "ssen", "transformer_load_model.zip")
         with open(input_file, "rb") as f:
             df = ssen_api_client.transformer_load_model_dataframe(
                 f, cols=["full_nrn", "latitude", "longitude"]

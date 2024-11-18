@@ -130,10 +130,9 @@ class LiveSSENAPIClient(SSENAPIClient):
             )
 
 
-class TestSSENAPIClient(SSENAPIClient):
+class StubSSENAPICLient(SSENAPIClient):
     file_to_download: str | None
 
-    # ../weave_tests/fixtures/ssen_files.json
     def get_available_files(self) -> list[AvailableFile]:
         with open(self.available_files_url) as f:
             return self._map_available_files(json.load(f))

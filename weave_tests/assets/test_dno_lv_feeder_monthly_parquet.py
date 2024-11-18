@@ -1,13 +1,11 @@
 import os
 
 import pandas as pd
-import pytest
 from dagster import build_asset_context
 from zlib_ng import zlib_ng
 
 from weave.assets.dno_lv_feeder_monthly_parquet import ssen_lv_feeder_monthly_parquet
 from weave.resources.output_files import OutputFilesResource
-from weave.resources.ssen import TestSSENAPIClient
 
 FIXTURE_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
@@ -16,19 +14,13 @@ FIXTURE_DIR = os.path.join(
 )
 
 
-@pytest.fixture
-def ssen_api_client():
-    return TestSSENAPIClient(
-        available_files_url=os.path.join(FIXTURE_DIR, "ssen_files.json"),
-        file_to_download=os.path.join(FIXTURE_DIR, "ssen_2024-02-12_head.csv"),
-    )
-
-
 def create_daily_files(year, month, start, end, dir):
     # 4 different secondary substations with 2 feeders each, one will have locations
     # from the postcodes lookup and the other from the transformer load model, the final
     # one will remain blank
-    input_file = os.path.join(FIXTURE_DIR, "ssen_location_lookup.csv")
+    input_file = os.path.join(
+        FIXTURE_DIR, "ssen", "lv_feeder_files", "2024-02-12_for_location_lookup.csv"
+    )
     for day in range(start, end):
         filename = dir / f"{year}-{month:02d}-{day:02d}.csv.gz"
         with open(filename.as_posix(), "wb") as output_file:

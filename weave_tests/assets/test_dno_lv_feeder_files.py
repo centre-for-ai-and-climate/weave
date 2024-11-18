@@ -6,7 +6,7 @@ from dagster import build_asset_context
 
 from weave.assets.dno_lv_feeder_files import ssen_lv_feeder_files
 from weave.resources.output_files import OutputFilesResource
-from weave.resources.ssen import TestSSENAPIClient
+from weave.resources.ssen import StubSSENAPICLient
 
 FIXTURE_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
@@ -17,9 +17,11 @@ FIXTURE_DIR = os.path.join(
 
 @pytest.fixture
 def ssen_api_client():
-    return TestSSENAPIClient(
-        available_files_url=os.path.join(FIXTURE_DIR, "ssen_files.json"),
-        file_to_download=os.path.join(FIXTURE_DIR, "ssen_2024-02-12_head.csv"),
+    return StubSSENAPICLient(
+        available_files_url=os.path.join(FIXTURE_DIR, "ssen", "available_files.json"),
+        file_to_download=os.path.join(
+            FIXTURE_DIR, "ssen", "lv_feeder_files", "2024-02-12_head.csv"
+        ),
     )
 
 
