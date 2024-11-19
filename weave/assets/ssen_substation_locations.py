@@ -74,7 +74,7 @@ def ssen_substation_location_lookup_feeder_postcodes(
 
     # Standardise the postcodes and add substation ids, so we can match them
     df = _add_standardised_postcode_to_dataframe(df, postcode_column="postcode")
-    df, metadata = _filter_invalid_postcodes(df, "standardised_postcode")
+    df, metadata = _filter_invalid_postcodes(df, "standardised_postcode", metadata)
     df["substation_nrn"] = df.apply(_substation_nrn_from_lv_feeder_lookup, axis=1)
     df = df[["standardised_postcode", "substation_nrn"]]
 
@@ -201,8 +201,7 @@ def _filter_unlikely_substation_areas(
     )
     metadata["weave/excluded_polygons"] = len(
         gdf[
-            ((gdf.geometry.type == "LineString") & (gdf.geometry.length <= 100))
-            | (
+            (
                 (gdf.geometry.type == "Polygon")
                 & (gdf.geometry.area > 10000)
                 & (gdf.geometry.length / gdf.geometry.count_coordinates() > 100)
@@ -231,7 +230,8 @@ def _gdf_to_df_with_substation_geo_location(gdf: gpd.GeoDataFrame) -> pd.DataFra
     easier downstream use without GeoPandas."""
 
     gdf["substation_geo_location"] = gdf.geometry.apply(
-        lambda geometry: f"{geometry.x},{geometry.y}"
+        # Output in Lat,Lng i.e. y,x
+        lambda geometry: f"{geometry.y:.6f},{geometry.x:.6f}"
     )
 
     return pd.DataFrame(gdf[["substation_nrn", "substation_geo_location"]])
