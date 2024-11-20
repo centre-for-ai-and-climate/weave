@@ -1,8 +1,12 @@
+import warnings
+
 import geopandas as gpd
 import pandas as pd
 import pyproj
 from dagster import (
     AssetExecutionContext,
+    AutomationCondition,
+    ExperimentalWarning,
     MaterializeResult,
     asset,
 )
@@ -17,6 +21,8 @@ from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
 from .ons import onspd
 
+warnings.filterwarnings("ignore", category=ExperimentalWarning)
+
 # Allow pyproj to download grid shift files from their CDN for more accurate conversions
 # See ADR 0003 for more information on why we're doing this.
 pyproj.network.set_network_enabled(True)
@@ -24,7 +30,10 @@ tg = TransformerGroup("EPSG:27700", "EPSG:4326")
 assert tg.best_available, "PyProj could not get the OSNT15 grid shift file for OSGB36 -> WGS84 conversion, this is essential for accurate location conversion"
 
 
-@asset(description="SSEN's raw LV Feeder -> Postcode mapping file")
+@asset(
+    description="SSEN's raw LV Feeder -> Postcode mapping file",
+    automation_condition=AutomationCondition.on_cron("@daily"),
+)
 def ssen_lv_feeder_postcode_mapping(
     context: AssetExecutionContext,
     raw_files_resource: OutputFilesResource,
@@ -53,6 +62,7 @@ def ssen_lv_feeder_postcode_mapping(
 @asset(
     description="SSEN Substation location lookup table, built from their LV Feeder -> Substation mapping",
     deps=[ssen_lv_feeder_postcode_mapping, onspd],
+    automation_condition=AutomationCondition.eager(),
 )
 def ssen_substation_location_lookup_feeder_postcodes(
     context: AssetExecutionContext,
@@ -237,7 +247,10 @@ def _gdf_to_df_with_substation_geo_location(gdf: gpd.GeoDataFrame) -> pd.DataFra
     return pd.DataFrame(gdf[["substation_nrn", "substation_geo_location"]])
 
 
-@asset(description="SSEN's raw Transformer Load Model file")
+@asset(
+    description="SSEN's raw Transformer Load Model file",
+    automation_condition=AutomationCondition.on_cron("@monthly"),
+)
 def ssen_transformer_load_model(
     context: AssetExecutionContext,
     raw_files_resource: OutputFilesResource,
@@ -267,6 +280,7 @@ def ssen_transformer_load_model(
 @asset(
     description="SSEN substation lookup table, built from their Transformer Load Model",
     deps=[ssen_transformer_load_model],
+    automation_condition=AutomationCondition.eager(),
 )
 def ssen_substation_location_lookup_transformer_load_model(
     context: AssetExecutionContext,

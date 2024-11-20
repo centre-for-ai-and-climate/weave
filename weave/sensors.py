@@ -1,6 +1,9 @@
+import warnings
+
 from dagster import (
     DagsterEventType,
     EventRecordsFilter,
+    ExperimentalWarning,
     RunRequest,
     SensorEvaluationContext,
     SensorResult,
@@ -16,6 +19,8 @@ from .assets.dno_lv_feeder_files import (
 from .assets.dno_lv_feeder_monthly_parquet import ssen_lv_feeder_monthly_parquet_job
 from .resources.ssen import SSENAPIClient
 
+warnings.filterwarnings("ignore", category=ExperimentalWarning)
+
 
 @sensor(
     job=ssen_lv_feeder_files_job,
@@ -25,6 +30,12 @@ def ssen_lv_feeder_files_sensor(
     context: SensorEvaluationContext,
     ssen_api_client: SSENAPIClient,
 ) -> SensorResult | SkipReason:
+    """Sensor for new files from SSEN's raw data API.
+
+    Hits SSEN's file listing API and triggers run requests for any new daily files it
+    finds. The files are named in a sortable way - 2024-01-01 etc so that becomes our
+    cursor.
+    """
     available = ssen_api_client.get_available_files()
     latest_filename = available[-1].filename
     cursor = context.cursor or ""  # Cursors are optional

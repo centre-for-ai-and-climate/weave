@@ -1,6 +1,7 @@
 import os
+import warnings
 
-from dagster import Definitions, load_assets_from_modules
+from dagster import Definitions, ExperimentalWarning, load_assets_from_modules
 
 from .assets import (
     dno_lv_feeder_files,
@@ -12,6 +13,8 @@ from .resources.ons import LiveONSAPIClient
 from .resources.output_files import OutputFilesResource
 from .resources.ssen import LiveSSENAPIClient
 from .sensors import ssen_lv_feeder_files_sensor, ssen_lv_feeder_monthly_parquet_sensor
+
+warnings.filterwarnings("ignore", category=ExperimentalWarning)
 
 all_assets = load_assets_from_modules(
     [dno_lv_feeder_files, dno_lv_feeder_monthly_parquet, ssen_substation_locations, ons]

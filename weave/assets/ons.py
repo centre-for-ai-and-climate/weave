@@ -1,11 +1,24 @@
-from dagster import AssetExecutionContext, MaterializeResult, asset
+import warnings
+
+from dagster import (
+    AssetExecutionContext,
+    AutomationCondition,
+    ExperimentalWarning,
+    MaterializeResult,
+    asset,
+)
 from dagster_pandas.data_frame import create_table_schema_metadata_from_dataframe
 
 from ..resources.ons import ONSAPIClient
 from ..resources.output_files import OutputFilesResource
 
+warnings.filterwarnings("ignore", category=ExperimentalWarning)
 
-@asset(description="ONS Postcode Directory")
+
+@asset(
+    description="ONS Postcode Directory",
+    automation_condition=AutomationCondition.on_cron("@monthly"),
+)
 def onspd(
     context: AssetExecutionContext,
     ons_api_client: ONSAPIClient,
