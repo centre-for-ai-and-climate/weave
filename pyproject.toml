@@ -3,7 +3,7 @@ name = "weave"
 version = "0.1.0"
 description = "We unlock energy data for everyone"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "dagster>=1.9.2",
     "dagster-cloud>=1.9.2",
@@ -16,6 +16,7 @@ dependencies = [
     "humanize>=4.11.0",
     "dagster-pandas>=0.25.2",
     "geopandas>=1.0.1",
+    "httptools>=0.6.4",
 ]
 
 [build-system]
@@ -30,6 +31,7 @@ module_name = "weave.definitions"
 code_location_name = "weave"
 
 [tool.uv]
+python-preference = "only-managed"
 dev-dependencies = [
     "contextily>=1.6.2",
     "dagster-webserver>=1.9.2",
