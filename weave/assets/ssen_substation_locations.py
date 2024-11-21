@@ -1,12 +1,9 @@
-import warnings
-
 import geopandas as gpd
 import pandas as pd
 import pyproj
 from dagster import (
     AssetExecutionContext,
     AutomationCondition,
-    ExperimentalWarning,
     MaterializeResult,
     asset,
 )
@@ -20,8 +17,6 @@ from ..resources.ons import ONSAPIClient
 from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
 from .ons import onspd
-
-warnings.filterwarnings("ignore", category=ExperimentalWarning)
 
 # Allow pyproj to download grid shift files from their CDN for more accurate conversions
 # See ADR 0003 for more information on why we're doing this.

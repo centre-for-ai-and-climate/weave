@@ -1,5 +1,4 @@
 import calendar
-import warnings
 from datetime import datetime
 
 import pyarrow as pa
@@ -10,7 +9,6 @@ from dagster import (
     AssetExecutionContext,
     AssetSelection,
     AutomationCondition,
-    ExperimentalWarning,
     MonthlyPartitionsDefinition,
     asset,
     define_asset_job,
@@ -19,8 +17,6 @@ from zlib_ng import gzip_ng_threaded
 
 from ..core import DNO
 from ..resources.output_files import OutputFilesResource
-
-warnings.filterwarnings("ignore", category=ExperimentalWarning)
 
 # Matches the data "as-is". I wanted to add some space-saving optimizations
 # like dictionaries for the name columns, but it doesn't work with joining for some
