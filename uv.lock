@@ -3072,7 +3072,7 @@ dev = [
 requires-dist = [
     { name = "dagster", specifier = ">=1.9.2" },
     { name = "dagster-cloud", specifier = ">=1.9.2" },
-    { name = "dagster-pandas", specifier = ">=0.24.8" },
+    { name = "dagster-pandas", specifier = ">=0.25.2" },
     { name = "geopandas", specifier = ">=1.0.1" },
     { name = "humanize", specifier = ">=4.11.0" },
     { name = "pandas", specifier = ">=2.2.3" },

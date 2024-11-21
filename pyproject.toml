@@ -14,7 +14,7 @@ dependencies = [
     "zlib-ng>=0.5.1",
     "s3fs>=2024.9.0",
     "humanize>=4.11.0",
-    "dagster-pandas>=0.24.8",
+    "dagster-pandas>=0.25.2",
     "geopandas>=1.0.1",
 ]
 
