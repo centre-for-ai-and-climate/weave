@@ -6,6 +6,8 @@ import pyarrow.compute as pc
 import pyarrow.csv as pa_csv
 import pyarrow.parquet as pq
 from dagster import (
+    AllPartitionMapping,
+    AssetDep,
     AssetExecutionContext,
     AssetSelection,
     AutomationCondition,
@@ -62,7 +64,10 @@ pyarrow_csv_convert_options = pa_csv.ConvertOptions(
     substation locations added""",
     partitions_def=MonthlyPartitionsDefinition(start_date="2024-02-01", end_offset=1),
     deps=[
-        "ssen_lv_feeder_files",
+        # Each partition is not really dependent on all of the partitions of the raw
+        # files, but we don't have a way to express that in Dagster yet. This stops it
+        # breaking when it tries to check there are valid partitions.
+        AssetDep("ssen_lv_feeder_files", partition_mapping=AllPartitionMapping()),
         "ssen_substation_location_lookup_feeder_postcodes",
         "ssen_substation_location_lookup_transformer_load_model",
     ],
