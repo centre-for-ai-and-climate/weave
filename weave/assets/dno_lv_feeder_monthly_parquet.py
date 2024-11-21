@@ -62,10 +62,7 @@ pyarrow_csv_convert_options = pa_csv.ConvertOptions(
     substation locations added""",
     partitions_def=MonthlyPartitionsDefinition(start_date="2024-02-01", end_offset=1),
     deps=[
-        # "ssen_lv_feeder_files", - Can't tell dagster about this dependency or it
-        # will try to check it has matching partitions, which it doesn't because it's
-        # dynamic. This breaks launching backfills, either manually or automatically
-        # through the automation_condition.
+        "ssen_lv_feeder_files",
         "ssen_substation_location_lookup_feeder_postcodes",
         "ssen_substation_location_lookup_transformer_load_model",
     ],
