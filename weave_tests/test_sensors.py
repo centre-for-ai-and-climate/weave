@@ -13,7 +13,7 @@ from weave.assets.dno_lv_feeder_files import (
     ssen_lv_feeder_files_partitions_def,
 )
 from weave.resources.output_files import OutputFilesResource
-from weave.resources.ssen import TestSSENAPIClient
+from weave.resources.ssen import StubSSENAPICLient
 from weave.sensors import (
     ssen_lv_feeder_files_sensor,
     ssen_lv_feeder_monthly_parquet_sensor,
@@ -37,9 +37,11 @@ def context(instance):
 
 @pytest.fixture
 def api_client():
-    return TestSSENAPIClient(
-        available_files_url=os.path.join(FIXTURE_DIR, "ssen_files.json"),
-        file_to_download=os.path.join(FIXTURE_DIR, "ssen_2024-02-12_head.csv"),
+    return StubSSENAPICLient(
+        available_files_url=os.path.join(FIXTURE_DIR, "ssen", "available_files.json"),
+        file_to_download=os.path.join(
+            FIXTURE_DIR, "ssen", "lv_feeder_files", "2024-02-12_head.csv"
+        ),
     )
 
 
@@ -67,8 +69,10 @@ class TestSSENLVFeederFilesSensor:
     def test_with_cursor(self, context, api_client):
         instance = DagsterInstance.ephemeral()
         context = build_sensor_context(instance=instance, cursor="2024-08-31.csv")
-        api_client = TestSSENAPIClient(
-            available_files_url=os.path.join(FIXTURE_DIR, "ssen_files.json")
+        api_client = StubSSENAPICLient(
+            available_files_url=os.path.join(
+                FIXTURE_DIR, "ssen", "available_files.json"
+            )
         )
         result = ssen_lv_feeder_files_sensor(context, ssen_api_client=api_client)
         assert len(result.run_requests) == 27
@@ -85,8 +89,10 @@ class TestSSENLVFeederFilesSensor:
     def test_no_results(self, context, api_client):
         instance = DagsterInstance.ephemeral()
         context = build_sensor_context(instance=instance, cursor="2024-09-27.csv")
-        api_client = TestSSENAPIClient(
-            available_files_url=os.path.join(FIXTURE_DIR, "ssen_files.json")
+        api_client = StubSSENAPICLient(
+            available_files_url=os.path.join(
+                FIXTURE_DIR, "ssen", "available_files.json"
+            )
         )
         result = ssen_lv_feeder_files_sensor(context, ssen_api_client=api_client)
         assert isinstance(result, SkipReason)

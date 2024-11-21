@@ -8,6 +8,7 @@ __pycache__
 data/**/*.csv
 data/**/*.parquet
 data/**/*.csv.gz
+data/**/*.zip
 .coverage
 coverage.xml
 pytest.xml

@@ -1,0 +1,7 @@
+dataset_id,dno_name,dno_alias,secondary_substation_id,secondary_substation_name,lv_feeder_id,lv_feeder_name,substation_geo_location,aggregated_device_count_active,primary_consumption_active_import,secondary_consumption_active_import,total_consumption_active_import,aggregated_device_count_reactive,total_consumption_reactive_import,data_collection_log_timestamp,insert_time,last_modified_time
+000200200402,Scottish and Southern Electricity Networks,SSEN,004,DUNCRAIG ROAD,02,"","",15.0,2331.0,"",2331.0,15.0,84.0,2024-02-12T00:30:00.000Z,2024-02-14T00:07:06.000Z,2024-03-25T12:46:46.298Z
+000200200404,Scottish and Southern Electricity Networks,SSEN,004,DUNCRAIG ROAD,04,"","",10.0,2955.0,"",2955.0,10.0,132.0,2024-02-12T00:30:00.000Z,2024-02-14T00:07:06.000Z,2024-03-25T12:46:46.298Z
+000200200901,Scottish and Southern Electricity Networks,SSEN,009,DUNHOLM PL,01,"","",37.0,3844.0,"",3844.0,37.0,94.0,2024-02-12T00:30:00.000Z,2024-02-14T00:07:06.000Z,2024-03-25T12:46:46.298Z
+000200200902,Scottish and Southern Electricity Networks,SSEN,009,DUNHOLM PL,02,"","",14.0,2384.0,"",2384.0,14.0,61.0,2024-02-12T00:30:00.000Z,2024-02-14T00:07:06.000Z,2024-03-25T12:46:46.298Z
+000200202002,Scottish and Southern Electricity Networks,SSEN,020,RAVENSCRAIG,02,"","",10.0,949.0,"",949.0,10.0,100.0,2024-02-12T00:30:00.000Z,2024-02-14T00:07:06.000Z,2024-03-25T12:46:46.298Z
+000200202003,Scottish and Southern Electricity Networks,SSEN,020,RAVENSCRAIG,03,"","",23.0,4513.0,"",4513.0,23.0,599.0,2024-02-12T00:30:00.000Z,2024-02-14T00:07:06.000Z,2024-03-25T12:46:46.298Z
