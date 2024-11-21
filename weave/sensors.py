@@ -1,9 +1,6 @@
-import warnings
-
 from dagster import (
     DagsterEventType,
     EventRecordsFilter,
-    ExperimentalWarning,
     RunRequest,
     SensorEvaluationContext,
     SensorResult,
@@ -18,8 +15,6 @@ from .assets.dno_lv_feeder_files import (
 )
 from .assets.dno_lv_feeder_monthly_parquet import ssen_lv_feeder_monthly_parquet_job
 from .resources.ssen import SSENAPIClient
-
-warnings.filterwarnings("ignore", category=ExperimentalWarning)
 
 
 @sensor(

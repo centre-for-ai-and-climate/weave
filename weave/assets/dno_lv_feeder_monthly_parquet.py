@@ -1,5 +1,4 @@
 import calendar
-import warnings
 from datetime import datetime
 
 import pyarrow as pa
@@ -10,7 +9,6 @@ from dagster import (
     AssetExecutionContext,
     AssetSelection,
     AutomationCondition,
-    ExperimentalWarning,
     MonthlyPartitionsDefinition,
     asset,
     define_asset_job,
@@ -19,8 +17,6 @@ from zlib_ng import gzip_ng_threaded
 
 from ..core import DNO
 from ..resources.output_files import OutputFilesResource
-
-warnings.filterwarnings("ignore", category=ExperimentalWarning)
 
 # Matches the data "as-is". I wanted to add some space-saving optimizations
 # like dictionaries for the name columns, but it doesn't work with joining for some
@@ -66,7 +62,10 @@ pyarrow_csv_convert_options = pa_csv.ConvertOptions(
     substation locations added""",
     partitions_def=MonthlyPartitionsDefinition(start_date="2024-02-01", end_offset=1),
     deps=[
-        "ssen_lv_feeder_files",
+        # "ssen_lv_feeder_files", - Can't tell dagster about this dependency or it
+        # will try to check it has matching partitions, which it doesn't because it's
+        # dynamic. This breaks launching backfills, either manually or automatically
+        # through the automation_condition.
         "ssen_substation_location_lookup_feeder_postcodes",
         "ssen_substation_location_lookup_transformer_load_model",
     ],
