@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 import responses
 from dagster import build_asset_context
+from zlib_ng import zlib_ng
 
 from weave.core import AvailableFile
 from weave.resources.ons import LiveONSAPIClient
@@ -128,6 +129,21 @@ class TestLiveSSENAPIClient:
             assert df["full_nrn"].dtype == "string", "full_nrn should be string"
             assert df["latitude"].dtype == "float", "latitude should be float"
             assert df["longitude"].dtype == "float", "longitude should be float"
+
+    def test_lv_feeder_file_pyarrow_table(self, tmp_path, ssen_api_client):
+        input_file = os.path.join(
+            FIXTURE_DIR, "ssen", "lv_feeder_files", "2024-02-12_head.csv"
+        )
+        with open(input_file, "rb") as f:
+            gzipped_file = tmp_path / "2024-02-12.csv.gz"
+            with open(gzipped_file, "wb") as output_file:
+                output_file.write(
+                    zlib_ng.compress(f.read(), level=1, wbits=zlib_ng.MAX_WBITS | 16)
+                )
+
+        with open(gzipped_file, "rb") as f:
+            table = ssen_api_client.lv_feeder_file_pyarrow_table(f)
+            assert table.num_rows == 10
 
 
 class TestLiveONSClient:
