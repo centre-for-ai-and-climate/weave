@@ -12,3 +12,7 @@ class OutputFilesResource(ConfigurableResource):
 
     def path(self, dno, filename):
         return f"{self.url}/{dno}/{filename}"
+
+    def delete(self, dno, filename):
+        file = self.open(dno, filename)
+        return file.fs.delete(file.path)

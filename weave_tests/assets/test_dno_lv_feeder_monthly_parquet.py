@@ -6,6 +6,7 @@ from zlib_ng import zlib_ng
 
 from weave.assets.dno_lv_feeder_monthly_parquet import ssen_lv_feeder_monthly_parquet
 from weave.resources.output_files import OutputFilesResource
+from weave.resources.ssen import StubSSENAPICLient
 
 FIXTURE_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
@@ -63,8 +64,11 @@ def test_ssen_lv_feeder_monthly_parquet(tmp_path):
     context = build_asset_context(partition_key="2024-02-01")
     staging_files_resource = OutputFilesResource(url=(tmp_path / "staging").as_uri())
     raw_files_resource = OutputFilesResource(url=(tmp_path / "raw").as_uri())
+    ssen_api_client = StubSSENAPICLient()
 
-    ssen_lv_feeder_monthly_parquet(context, raw_files_resource, staging_files_resource)
+    ssen_lv_feeder_monthly_parquet(
+        context, raw_files_resource, staging_files_resource, ssen_api_client
+    )
 
     df = pd.read_parquet(output_dir / "2024-02.parquet", engine="pyarrow")
     assert len(df) == 6 * 29  # 6 rows in the fixture * 29 days

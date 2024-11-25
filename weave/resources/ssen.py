@@ -4,13 +4,16 @@ import zipfile
 import zlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from typing import ClassVar
 
 import humanize
 import pandas as pd
+import pyarrow as pa
+import pyarrow.csv as pa_csv
 import requests
 from dagster import AssetExecutionContext, ConfigurableResource
 from fsspec.core import OpenFile
-from zlib_ng import zlib_ng
+from zlib_ng import gzip_ng_threaded, zlib_ng
 
 from ..core import AvailableFile
 
@@ -23,6 +26,26 @@ class SSENAPIClient(ConfigurableResource, ABC):
     )
     postcode_mapping_url: str = "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv"
     transformer_load_model_url: str = "https://data-api.ssen.co.uk/dataset/d1c4009b-4386-4208-a14f-cc09aeeb4777/resource/53b2b871-4c28-4ba9-85d4-c9ba6452aa15/download/onedrive_1_01-08-2024.zip"
+    # Matches the data "as-is". I wanted to add some space-saving optimizations
+    # like dictionaries for the name columns, but it doesn't work with joining for some
+    # reason.
+    # See https://github.com/pydantic/pydantic/issues/1927
+    lv_feeder_pyarrow_schema: ClassVar = pa.schema(
+        [
+            ("dataset_id", pa.string()),
+            ("dno_alias", pa.string()),
+            ("secondary_substation_id", pa.string()),
+            ("secondary_substation_name", pa.string()),
+            ("lv_feeder_id", pa.string()),
+            ("lv_feeder_name", pa.string()),
+            ("substation_geo_location", pa.string()),
+            ("aggregated_device_count_active", pa.float64()),
+            ("total_consumption_active_import", pa.float64()),
+            ("data_collection_log_timestamp", pa.timestamp("ms", tz="UTC")),
+            ("insert_time", pa.timestamp("ms", tz="UTC")),
+            ("last_modified_time", pa.timestamp("ms", tz="UTC")),
+        ]
+    )
 
     @abstractmethod
     def get_available_files(self) -> list[AvailableFile]:
@@ -79,6 +102,28 @@ class SSENAPIClient(ConfigurableResource, ABC):
                 with zipfile.ZipFile(io.BytesIO(z_inner.read())) as z_nested:
                     with z_nested.open("SEPD_transformers_open_data_with_nrn.csv") as f:
                         return pd.read_csv(f, usecols=cols, dtype=dtypes)
+
+    def lv_feeder_file_pyarrow_table(self, input_file: OpenFile):
+        """Read an LV Feeder CSV file into a PyArrow Table."""
+        pyarrow_csv_convert_options = pa_csv.ConvertOptions(
+            column_types=self.lv_feeder_pyarrow_schema,
+            include_columns=[
+                "dataset_id",
+                "dno_alias",
+                "secondary_substation_id",
+                "secondary_substation_name",
+                "lv_feeder_id",
+                "lv_feeder_name",
+                "substation_geo_location",
+                "aggregated_device_count_active",
+                "total_consumption_active_import",
+                "data_collection_log_timestamp",
+                "insert_time",
+                "last_modified_time",
+            ],
+        )
+        with gzip_ng_threaded.open(input_file, "rb", threads=pa.io_thread_count()) as f:
+            return pa_csv.read_csv(f, convert_options=pyarrow_csv_convert_options)
 
 
 class LiveSSENAPIClient(SSENAPIClient):
