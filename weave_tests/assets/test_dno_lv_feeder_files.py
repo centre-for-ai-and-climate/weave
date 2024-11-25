@@ -1,6 +1,7 @@
 import os
 
 import pandas as pd
+import pyarrow as pa
 import pytest
 from dagster import build_asset_context
 
@@ -36,3 +37,23 @@ def test_ssen_lv_feeder_files(tmp_path, ssen_api_client):
 
     df = pd.read_csv((output_dir / "2024-02-12.csv.gz").as_posix())
     assert len(df) == 10
+
+
+def test_ssen_lv_feeder_files_deletes_bad_files(tmp_path):
+    output_dir = tmp_path / "ssen"
+    output_dir.mkdir()
+    context = build_asset_context(
+        partition_key="https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-11-18.csv"
+    )
+    raw_files_resource = OutputFilesResource(url=tmp_path.as_uri())
+    ssen_api_client = StubSSENAPICLient(
+        available_files_url=os.path.join(FIXTURE_DIR, "ssen", "available_files.json"),
+        file_to_download=os.path.join(
+            FIXTURE_DIR, "ssen", "lv_feeder_files", "2024-11-18_bad.csv"
+        ),
+    )
+
+    with pytest.raises(pa.lib.ArrowInvalid):
+        ssen_lv_feeder_files(context, raw_files_resource, ssen_api_client)
+
+    assert not (output_dir / "2024-11-18.csv.gz").exists()

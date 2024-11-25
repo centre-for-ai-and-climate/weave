@@ -3,7 +3,6 @@ from datetime import datetime
 
 import pyarrow as pa
 import pyarrow.compute as pc
-import pyarrow.csv as pa_csv
 import pyarrow.parquet as pq
 from dagster import (
     AllPartitionMapping,
@@ -11,51 +10,15 @@ from dagster import (
     AssetExecutionContext,
     AssetSelection,
     AutomationCondition,
+    MaterializeResult,
     MonthlyPartitionsDefinition,
     asset,
     define_asset_job,
 )
-from zlib_ng import gzip_ng_threaded
 
 from ..core import DNO
 from ..resources.output_files import OutputFilesResource
-
-# Matches the data "as-is". I wanted to add some space-saving optimizations
-# like dictionaries for the name columns, but it doesn't work with joining for some
-# reason.
-pyarrow_schema = pa.schema(
-    [
-        ("dataset_id", pa.string()),
-        ("dno_alias", pa.string()),
-        ("secondary_substation_id", pa.string()),
-        ("secondary_substation_name", pa.string()),
-        ("lv_feeder_id", pa.string()),
-        ("lv_feeder_name", pa.string()),
-        ("substation_geo_location", pa.string()),
-        ("aggregated_device_count_active", pa.float64()),
-        ("total_consumption_active_import", pa.float64()),
-        ("data_collection_log_timestamp", pa.timestamp("ms", tz="UTC")),
-        ("insert_time", pa.timestamp("ms", tz="UTC")),
-        ("last_modified_time", pa.timestamp("ms", tz="UTC")),
-    ]
-)
-pyarrow_csv_convert_options = pa_csv.ConvertOptions(
-    column_types=pyarrow_schema,
-    include_columns=[
-        "dataset_id",
-        "dno_alias",
-        "secondary_substation_id",
-        "secondary_substation_name",
-        "lv_feeder_id",
-        "lv_feeder_name",
-        "substation_geo_location",
-        "aggregated_device_count_active",
-        "total_consumption_active_import",
-        "data_collection_log_timestamp",
-        "insert_time",
-        "last_modified_time",
-    ],
-)
+from ..resources.ssen import SSENAPIClient
 
 
 @asset(
@@ -80,7 +43,9 @@ def ssen_lv_feeder_monthly_parquet(
     context: AssetExecutionContext,
     raw_files_resource: OutputFilesResource,
     staging_files_resource: OutputFilesResource,
-) -> None:
+    ssen_api_client: SSENAPIClient,
+) -> MaterializeResult:
+    metadata = {}
     partition_date = datetime.strptime(context.partition_key, "%Y-%m-%d")
     year = partition_date.year
     month = partition_date.month
@@ -89,10 +54,17 @@ def ssen_lv_feeder_monthly_parquet(
     location_lookup = _substation_location_lookup(staging_files_resource)
     context.log.info(f"Producing {monthly_file} from {len(daily_files)} daily files")
     with staging_files_resource.open(DNO.SSEN.value, monthly_file, mode="wb") as out:
-        parquet_writer = pq.ParquetWriter(out, pyarrow_schema)
+        parquet_writer = pq.ParquetWriter(out, ssen_api_client.lv_feeder_pyarrow_schema)
+        metadata["dagster/uri"] = staging_files_resource.path(
+            DNO.SSEN.value, monthly_file
+        )
+        metadata["dagster/row_count"] = 0
+        metadata["weave/nunique_feeders"] = 0
         for csv in daily_files:
             try:
-                table = _read_csv_into_pyarrow_table(context, raw_files_resource, csv)
+                table = _read_csv_into_pyarrow_table(
+                    context, raw_files_resource, ssen_api_client, csv
+                )
                 table = table.append_column(
                     "substation_nrn",
                     [pc.utf8_slice_codeunits(table.column("dataset_id"), 0, 10)],
@@ -112,12 +84,19 @@ def ssen_lv_feeder_monthly_parquet(
                 table = table.drop_columns(
                     ["substation_nrn", "substation_geo_location_lookup"]
                 )
+
+                metadata["dagster/row_count"] += table.num_rows
+                metadata["weave/nunique_feeders"] += pc.count_distinct(
+                    table.column("dataset_id")
+                ).as_py()
                 parquet_writer.write_table(table)
             except FileNotFoundError:
                 context.log.info(
                     f"Ignoring missing SSEN daily file {csv} when building monthly file {monthly_file}"
                 )
         parquet_writer.close()
+
+    return MaterializeResult(metadata=metadata)
 
 
 def _ssen_files_for_month(year: int, month: int):
@@ -129,11 +108,12 @@ def _ssen_files_for_month(year: int, month: int):
     return files
 
 
-def _read_csv_into_pyarrow_table(context, raw_files_resource, filename):
+def _read_csv_into_pyarrow_table(
+    context, raw_files_resource, ssen_api_client, filename
+):
     context.log.info(f"Processing {filename}")
     with raw_files_resource.open(DNO.SSEN.value, filename, mode="rb") as gzipf:
-        with gzip_ng_threaded.open(gzipf, "rb", threads=pa.io_thread_count()) as f:
-            return pa_csv.read_csv(f, convert_options=pyarrow_csv_convert_options)
+        return ssen_api_client.lv_feeder_file_pyarrow_table(gzipf)
 
 
 def _substation_location_lookup(
