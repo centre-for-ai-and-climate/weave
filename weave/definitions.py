@@ -3,6 +3,7 @@ import os
 from dagster import Definitions, load_assets_from_modules
 
 from .assets import (
+    dno_lv_feeder_combined_geoparquet,
     dno_lv_feeder_files,
     dno_lv_feeder_monthly_parquet,
     ons,
@@ -14,7 +15,13 @@ from .resources.ssen import LiveSSENAPIClient
 from .sensors import ssen_lv_feeder_files_sensor, ssen_lv_feeder_monthly_parquet_sensor
 
 all_assets = load_assets_from_modules(
-    [dno_lv_feeder_files, dno_lv_feeder_monthly_parquet, ssen_substation_locations, ons]
+    [
+        dno_lv_feeder_files,
+        dno_lv_feeder_monthly_parquet,
+        ssen_substation_locations,
+        ons,
+        dno_lv_feeder_combined_geoparquet,
+    ]
 )
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -29,6 +36,9 @@ resources = {
         "staging_files_resource": OutputFilesResource(
             url=f"file://{os.path.join(DATA_DIR, "staging")}"
         ),
+        "output_files_resource": OutputFilesResource(
+            url=f"file://{os.path.join(DATA_DIR, "output", "beta")}"
+        ),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
     },
@@ -37,6 +47,7 @@ resources = {
         "staging_files_resource": OutputFilesResource(
             url="s3://weave.energy-dev/data/staging"
         ),
+        "output_files_resource": OutputFilesResource(url="s3://weave.energy-dev/beta"),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
     },
@@ -47,6 +58,9 @@ resources = {
         "staging_files_resource": OutputFilesResource(
             url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/data/staging"
         ),
+        "output_files_resource": OutputFilesResource(
+            url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/beta"
+        ),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
     },
@@ -55,6 +69,7 @@ resources = {
         "staging_files_resource": OutputFilesResource(
             url="s3://weave.energy/data/staging"
         ),
+        "output_files_resource": OutputFilesResource(url="s3://weave.energy/beta"),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
     },
