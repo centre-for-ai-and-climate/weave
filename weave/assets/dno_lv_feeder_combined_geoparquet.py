@@ -99,7 +99,7 @@ def lv_feeder_combined_geoparquet(
                 ).as_py()
 
                 processed_rows += table.num_rows
-                percentage_processed = processed_rows / total_rows * 100
+                percentage_processed = int(processed_rows / total_rows * 100)
                 context.log.info(
                     f"Processed {processed_rows} rows ({percentage_processed}% of total)"
                 )
