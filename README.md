@@ -1,6 +1,9 @@
-# weave
+# Weave
+We unlock energy data: https://weave.energy
 
-This is a [Dagster](https://dagster.io/) project scaffolded with [`dagster project scaffold`](https://docs.dagster.io/getting-started/create-new-project), but instead of using pip, it uses [uv](https://github.com/astral-sh/uv).
+This repository holds the data pipeline and documentation for Weave, a project by the Centre for AI and Climate to unlock smart meter data from UK electricity distribution network operators (DNOs).
+
+Our data pipeline runs on https://dagster.io, so this is primarily a Dagster project, with some additional jupyter notebooks and documentation.
 
 ## Getting started
 
