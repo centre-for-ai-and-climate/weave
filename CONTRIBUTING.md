@@ -99,20 +99,57 @@ A brief overview of the folder structures and main code locations in the project
     | fixtures          # Test fixture files
 ```
 
+Weave is primarily a Dagster data pipeline project, so this structure matches up with
+their project template. The most important things to be aware of are:
+
+#### Assets
+Data outputs are modelled as Dagster Assets. These are python functions which Dagster
+runs in a serverless environment, gives some "Resources" to and then expects to produce
+some output.
+
+Our general principles for assets are:
+- Raw data from external sources is first saved as-is before being transformed further.
+  (Except it should be compressed if it isn't already to avoid being wasteful with
+  bandwidth and storage space)
+- All assets save data through an OutputFilesResource, abstracting whether it's in an
+  S3 bucket, on local disk, or elsewhere.
+- We save all other data in parquet files
+- We default to streaming and iteratively processing data using PyArrow, only reverting
+  to Pandas/Geopandas where we have to
+
+### Resources
+Resources exist in order to allow dependency injection into assets. We have two main
+kinds of resource at the moment: abstractions over data storage and "Client" objects
+that encapsulate the complexities of interacting with external data sources and APIs.
+
+A primary aim of these classes is to allow us to run things in different environments
+and particularly to enable easy testing of assets.
+
+#### Core
+Our core domain model code is pretty minimal at the moment, but it contains things like:
+- Enums, Types and Dataclasses
+- Schemas
+
 ### Development environment
 We use VSCode, so there are some additional vscode settings included in the repo, but
-this is primarily to help integrate our testing and linting setup.
+this is primarily to help integrate our testing and linting setup, it's not required.
 
 Whatever IDE or editor you use, the primary thing to be aware of is that we lint and
-format our Python code with [Ruff](https://astral.sh/ruff), so it will probably help
-avoid problems if you have that run automatically in your environment too.
+format our Python code with [Ruff](https://astral.sh/ruff), so it will help avoid
+problems if you have that run automatically in your environment too.
 
-### Adding new Python dependencies
-As mentioned above, we use UV to manage our python environment, so that's as simple as
+### Managing dependencies
+As mentioned above, we use UV to manage our python environment, so adding dependencies
+is as simple as:
 
 ```bash
 uv add dependency-name
 ```
+
+In general, we like to use the latest stable version of everything and then keep
+everything continuously updated. Therefore, please try to think carefully before
+introducing new dependencies - we want to minimise our maintenance burden and make sure
+the project remains easy to run for as wide an audience as possible.
 
 Note that we use UV's feature for segregating development dependencies, so that we can
 keep our production environment lean. In other words, if you need to install something
@@ -133,10 +170,6 @@ In general we try to make sure there are unit tests for each Asset, Resource and
 We use a dependency injection approach over mocking wherever possible, e.g. having
 API clients implement an abstract class and providing a configurable test
 implementation as well as a "live" one.
-
-We have an outstanding TODO to add more fully featured integration tests, ideally
-involving the dagster development server, but mocking/stubbing external resources in
-that environment seems tricky.
 
 ### ADRs
 We try to record major decisions we've made in the form of Architectural Decision
