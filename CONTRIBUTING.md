@@ -3,8 +3,8 @@ Thank you for your interest in contributing to Weave!
 
 We're trying to unlock energy data, so that people can bring the power of machine
 learning and artificial intelligence to bear on climate problems. There are lots of ways
-you can help, beyond just writing code, but there's also lots of code that needs
-writing too!
+you can help, beyond just writing code (but there's also lots of code that needs
+writing too!).
 
 ## Ways to contribute
 Some things we'd love to see:
@@ -17,7 +17,7 @@ Some things we'd love to see:
 - Check out our [issues](https://github.com/centre-for-ai-and-climate/weave/contribute)
   for something we want to add or improve.
 
-If you're unsure, please do reach out to us
+If you're unsure, please do reach out to us in [GitHub Discussions](https://github.com/centre-for-ai-and-climate/weave/discussions/new?category=general).
 
 
 ## Getting started with the code
