@@ -1,6 +1,8 @@
 # Weave
 We unlock energy data: https://weave.energy
 
+![Map visualisation of the UK's energy consumption](docs/weave-map.png)
+
 This repository holds the data pipeline and technical documentation for Weave, a project
 by [the Centre for AI and Climate](https://www.c-ai-c.org/) and
 [CEIMIA](https://ceimia.org). Our mission is to accelerate the application of artificial
