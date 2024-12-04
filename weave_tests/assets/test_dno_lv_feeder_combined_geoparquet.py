@@ -136,3 +136,23 @@ def test_lv_feeder_combined_geoparquet(tmp_path):
     assert gdf.iloc[0].dataset_id == "000200200101"
     assert gdf.iloc[0].secondary_substation_unique_id == "0002002001"
     assert gdf.iloc[0].lv_feeder_unique_id == "000200200101"
+
+
+def test_lv_feeder_combined_geoparquet_handles_missing_input(tmp_path):
+    input_dir = tmp_path / "staging" / "ssen"
+    input_dir.mkdir(parents=True)
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    # We haven't made any monthly files, so there's nothing to combine
+
+    context = build_asset_context(partition_key="2024-02-01")
+    staging_files_resource = OutputFilesResource(url=(tmp_path / "staging").as_uri())
+    output_files_resource = OutputFilesResource(url=(tmp_path / "output").as_uri())
+
+    # Shouldn't raise, this is an expected situation at the beginning of the month
+    lv_feeder_combined_geoparquet(
+        context, staging_files_resource, output_files_resource
+    )
+
+    assert not (output_dir / "smart-meter" / "2024-02.parquet").exists()
