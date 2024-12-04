@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Generator
 
 import geopandas as gpd
 import pyarrow as pa
@@ -41,71 +42,96 @@ def lv_feeder_combined_geoparquet(
     month = partition_date.month
     monthly_file = f"{year}-{month:02d}.parquet"
 
-    with output_files_resource.open("smart-meter", monthly_file, mode="wb") as out:
-        sorting_columns = [
-            pq.SortingColumn(4),
-            pq.SortingColumn(1),
-            pq.SortingColumn(6),
-            pq.SortingColumn(7),
-        ]
-        parquet_writer = pq.ParquetWriter(
-            out,
-            schema=lv_feeder_geoparquet_schema,
-            compression="zstd",
-            compression_level=22,
-            coerce_timestamps="ms",
-            allow_truncated_timestamps=True,
-            sorting_columns=sorting_columns,
-            store_decimal_as_integer=True,
-        )
-        metadata["dagster/uri"] = output_files_resource.path(
-            "smart-meter", monthly_file
-        )
-        # Eventually this should loop over several DNOs and do different things for each
-        with staging_files_resource.open(
-            DNO.SSEN.value, monthly_file, mode="rb"
-        ) as in_file:
-            parquet_file = pq.ParquetFile(in_file)
-            total_rows = parquet_file.metadata.num_rows
-            processed_rows = 0
-            context.log.info(f"Processing file: {in_file}, total_rows: {total_rows}")
-            for batch in parquet_file.iter_batches(
-                batch_size=1024 * 1024,
-                columns=[
-                    "dataset_id",
-                    "dno_alias",
-                    "aggregated_device_count_active",
-                    "total_consumption_active_import",
-                    "data_collection_log_timestamp",
-                    "substation_geo_location",
-                ],
-            ):
-                table = _ssen_to_combined_geoparquet(batch, context)
-                table = table.sort_by(
-                    [
-                        ("data_collection_log_timestamp", "ascending"),
-                        ("dno_alias", "ascending"),
-                        ("secondary_substation_unique_id", "ascending"),
-                        ("lv_feeder_unique_id", "ascending"),
-                    ]
-                )
-                parquet_writer.write_table(table)
-                metadata["dagster/row_count"] += table.num_rows
-                metadata["weave/nunique_feeders"] += pc.count_distinct(
-                    table.column("lv_feeder_unique_id")
-                ).as_py()
-                metadata["weave/nunique_substations"] += pc.count_distinct(
-                    table.column("secondary_substation_unique_id")
-                ).as_py()
-
-                processed_rows += table.num_rows
-                percentage_processed = int(processed_rows / total_rows * 100)
+    try:
+        with output_files_resource.open("smart-meter", monthly_file, mode="wb") as out:
+            parquet_writer = _create_parquet_writer(out)
+            metadata["dagster/uri"] = output_files_resource.path(
+                "smart-meter", monthly_file
+            )
+            # Eventually this should loop over several DNOs and do different things for each
+            with staging_files_resource.open(
+                DNO.SSEN.value, monthly_file, mode="rb"
+            ) as in_file:
+                parquet_file = pq.ParquetFile(in_file)
+                total_rows = parquet_file.metadata.num_rows
+                processed_rows = 0
                 context.log.info(
-                    f"Processed {processed_rows} rows ({percentage_processed}% of total)"
+                    f"Processing file: {in_file}, total_rows: {total_rows}"
                 )
-        parquet_writer.close()
+                for batch in _generate_parquet_batches(parquet_file):
+                    table = _ssen_to_combined_geoparquet(batch, context)
+                    table = table.sort_by(
+                        [
+                            ("data_collection_log_timestamp", "ascending"),
+                            ("dno_alias", "ascending"),
+                            ("secondary_substation_unique_id", "ascending"),
+                            ("lv_feeder_unique_id", "ascending"),
+                        ]
+                    )
+                    parquet_writer.write_table(table)
+                    metadata = _update_metadata_for_batch(metadata, table)
+
+                    processed_rows += table.num_rows
+                    percentage_processed = int(processed_rows / total_rows * 100)
+                    context.log.info(
+                        f"Processed {processed_rows} rows ({percentage_processed}% of total)"
+                    )
+            parquet_writer.close()
+    except FileNotFoundError:
+        context.log.error("Failed to open monthly input file: {e}")
+        context.log.info(
+            f"Attempting to delete {output_files_resource.path("smart-meter", monthly_file)}"
+        )
+        output_files_resource.delete("smart-meter", monthly_file)
 
     return MaterializeResult(metadata=metadata)
+
+
+def _create_parquet_writer(out) -> pq.ParquetWriter:
+    sorting_columns = [
+        pq.SortingColumn(4),
+        pq.SortingColumn(1),
+        pq.SortingColumn(6),
+        pq.SortingColumn(7),
+    ]
+    return pq.ParquetWriter(
+        out,
+        schema=lv_feeder_geoparquet_schema,
+        compression="zstd",
+        compression_level=22,
+        coerce_timestamps="ms",
+        allow_truncated_timestamps=True,
+        sorting_columns=sorting_columns,
+        store_decimal_as_integer=True,
+    )
+
+
+def _generate_parquet_batches(
+    parquet_file: pq.ParquetFile,
+) -> Generator[pa.RecordBatch, None, None]:
+    return parquet_file.iter_batches(
+        batch_size=1024 * 1024,
+        columns=[
+            "dataset_id",
+            "dno_alias",
+            "aggregated_device_count_active",
+            "total_consumption_active_import",
+            "data_collection_log_timestamp",
+            "substation_geo_location",
+        ],
+    )
+
+
+def _update_metadata_for_batch(metadata: dict, table: pa.Table) -> dict:
+    metadata["dagster/row_count"] += table.num_rows
+    metadata["weave/nunique_feeders"] += pc.count_distinct(
+        table.column("lv_feeder_unique_id")
+    ).as_py()
+    metadata["weave/nunique_substations"] += pc.count_distinct(
+        table.column("secondary_substation_unique_id")
+    ).as_py()
+
+    return metadata
 
 
 def _ssen_to_combined_geoparquet(

@@ -96,6 +96,10 @@ def ssen_lv_feeder_monthly_parquet(
                 )
         parquet_writer.close()
 
+    if metadata["dagster/row_count"] == 0:
+        context.log.info(f"No data found for {monthly_file}, deleting empty file")
+        staging_files_resource.delete(DNO.SSEN.value, monthly_file)
+
     return MaterializeResult(metadata=metadata)
 
 
