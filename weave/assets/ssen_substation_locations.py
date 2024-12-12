@@ -12,6 +12,7 @@ from pyproj import Transformer
 from pyproj.transformer import TransformerGroup
 from shapely import Point
 
+from ..automation_conditions import needs_updating
 from ..core import DNO
 from ..resources.ons import ONSAPIClient
 from ..resources.output_files import OutputFilesResource
@@ -57,7 +58,7 @@ def ssen_lv_feeder_postcode_mapping(
 @asset(
     description="SSEN Substation location lookup table, built from their LV Feeder -> Substation mapping",
     deps=[ssen_lv_feeder_postcode_mapping, onspd],
-    automation_condition=AutomationCondition.eager(),
+    automation_condition=needs_updating(),
 )
 def ssen_substation_location_lookup_feeder_postcodes(
     context: AssetExecutionContext,
@@ -275,7 +276,7 @@ def ssen_transformer_load_model(
 @asset(
     description="SSEN substation lookup table, built from their Transformer Load Model",
     deps=[ssen_transformer_load_model],
-    automation_condition=AutomationCondition.eager(),
+    automation_condition=needs_updating(),
 )
 def ssen_substation_location_lookup_transformer_load_model(
     context: AssetExecutionContext,

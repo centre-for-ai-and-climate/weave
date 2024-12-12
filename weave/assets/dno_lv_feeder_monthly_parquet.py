@@ -9,13 +9,13 @@ from dagster import (
     AssetDep,
     AssetExecutionContext,
     AssetSelection,
-    AutomationCondition,
     MaterializeResult,
     MonthlyPartitionsDefinition,
     asset,
     define_asset_job,
 )
 
+from ..automation_conditions import lv_feeder_monthly_parquet_needs_updating
 from ..core import DNO
 from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
@@ -35,7 +35,7 @@ from ..resources.ssen import SSENAPIClient
         "ssen_substation_location_lookup_transformer_load_model",
     ],
     # See also sensors.ssen_lv_feeder_monthly_parquet_sensor
-    automation_condition=AutomationCondition.any_deps_updated().ignore(
+    automation_condition=lv_feeder_monthly_parquet_needs_updating(
         AssetSelection.assets("ssen_lv_feeder_files")
     ),
 )

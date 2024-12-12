@@ -7,13 +7,13 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 from dagster import (
     AssetExecutionContext,
-    AutomationCondition,
     MaterializeResult,
     MonthlyPartitionsDefinition,
     asset,
 )
 from geopandas.io.arrow import _geopandas_to_arrow
 
+from ..automation_conditions import needs_updating
 from ..core import DNO, lv_feeder_geoparquet_schema
 from ..resources.output_files import OutputFilesResource
 
@@ -25,7 +25,7 @@ from ..resources.output_files import OutputFilesResource
     feeder data we have.""",
     partitions_def=MonthlyPartitionsDefinition(start_date="2024-02-01", end_offset=1),
     deps=["ssen_lv_feeder_monthly_parquet"],
-    automation_condition=AutomationCondition.any_deps_updated(),
+    automation_condition=needs_updating(),
 )
 def lv_feeder_combined_geoparquet(
     context: AssetExecutionContext,
