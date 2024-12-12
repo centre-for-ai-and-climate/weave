@@ -12,3 +12,4 @@ data/**/*.zip
 .coverage
 coverage.xml
 pytest.xml
+/experiments/scratchpad.ipynb
