@@ -102,3 +102,25 @@ def test_ssen_lv_feeder_monthly_parquet(tmp_path):
     assert (
         df[df["dataset_id"] == "000200202003"].iloc[0].substation_geo_location is None
     )
+
+
+def test_ssen_lv_feeder_monthly_parquet_when_missing_input(tmp_path):
+    output_dir = tmp_path / "staging" / "ssen"
+    output_dir.mkdir(parents=True)
+    input_dir = tmp_path / "raw" / "ssen"
+    input_dir.mkdir(parents=True)
+
+    # No input daily files
+    create_substation_location_lookup_postcodes(output_dir)
+    substation_location_lookup_load_model(output_dir)
+
+    context = build_asset_context(partition_key="2024-02-01")
+    staging_files_resource = OutputFilesResource(url=(tmp_path / "staging").as_uri())
+    raw_files_resource = OutputFilesResource(url=(tmp_path / "raw").as_uri())
+    ssen_api_client = StubSSENAPICLient()
+
+    ssen_lv_feeder_monthly_parquet(
+        context, raw_files_resource, staging_files_resource, ssen_api_client
+    )
+
+    assert not (output_dir / "2024-02.parquet").exists()
