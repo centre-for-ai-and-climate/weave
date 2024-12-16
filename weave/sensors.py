@@ -1,6 +1,5 @@
 from dagster import (
-    DagsterEventType,
-    EventRecordsFilter,
+    AssetRecordsFilter,
     RunRequest,
     SensorEvaluationContext,
     SensorResult,
@@ -62,15 +61,18 @@ def ssen_lv_feeder_monthly_parquet_sensor(context: SensorEvaluationContext):
         cursor = int(context.cursor)
         context.log.info(f"Parsed cursor: {cursor}")
     # Find new materialisations of the raw files
-    new_materialisations = context.instance.get_event_records(
-        EventRecordsFilter(
-            event_type=DagsterEventType.ASSET_MATERIALIZATION,
+    new_materialisations, _cursor, has_more = context.instance.fetch_materializations(
+        AssetRecordsFilter(
             asset_key=ssen_lv_feeder_files.key,
-            after_cursor=cursor,
+            after_storage_id=cursor,
         ),
-        limit=None,
+        # This can't be None, but we want all of them and it's never going to be many
+        # so I can't be bothered trying to iterate over pages
+        limit=999,
         ascending=True,
     )
+
+    assert has_more is False, "We should never have more than 999 new materialisations"
 
     context.log.info(
         f"Found {len(new_materialisations)} new materialisation events for raw SSEN lv feeder files since cursor"
