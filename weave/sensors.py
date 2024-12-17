@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from dagster import (
     AssetRecordsFilter,
     RunRequest,
@@ -13,6 +15,7 @@ from .assets.dno_lv_feeder_files import (
     ssen_lv_feeder_files_partitions_def,
 )
 from .assets.dno_lv_feeder_monthly_parquet import ssen_lv_feeder_monthly_parquet_job
+from .assets.ssen_substation_locations import ssen_lv_feeder_postcode_mapping_job
 from .resources.ssen import SSENAPIClient
 
 
@@ -96,3 +99,24 @@ def ssen_lv_feeder_monthly_parquet_sensor(context: SensorEvaluationContext):
         )
     else:
         return SkipReason(skip_message="No new files found")
+
+
+@sensor(
+    job=ssen_lv_feeder_postcode_mapping_job,
+    minimum_interval_seconds=60 * 60 * 24,
+)
+def ssen_lv_feeder_postcode_mapping_sensor(
+    context: SensorEvaluationContext, ssen_api_client: SSENAPIClient
+) -> SensorResult | SkipReason:
+    last_modified = ssen_api_client.get_last_modified("ssen_lv_feeder_postcode_mapping")
+    previous_last_modified = None
+    if context.cursor is not None and context.cursor != "":
+        previous_last_modified = datetime.fromisoformat(context.cursor)
+
+    if previous_last_modified is None or last_modified > previous_last_modified:
+        return SensorResult(
+            run_requests=[RunRequest(job_name="ssen_lv_feeder_postcode_mapping_job")],
+            cursor=last_modified.isoformat(),
+        )
+    else:
+        return SkipReason(skip_message="Feeder postcode mapping file has not changed")

@@ -6,6 +6,7 @@ from dagster import (
     AutomationCondition,
     MaterializeResult,
     asset,
+    define_asset_job,
 )
 from dagster_pandas.data_frame import create_table_schema_metadata_from_dataframe
 from pyproj import Transformer
@@ -26,10 +27,7 @@ tg = TransformerGroup("EPSG:27700", "EPSG:4326")
 assert tg.best_available, "PyProj could not get the OSNT15 grid shift file for OSGB36 -> WGS84 conversion, this is essential for accurate location conversion"
 
 
-@asset(
-    description="SSEN's raw LV Feeder -> Postcode mapping file",
-    automation_condition=AutomationCondition.on_cron("@daily"),
-)
+@asset(description="SSEN's raw LV Feeder -> Postcode mapping file")
 def ssen_lv_feeder_postcode_mapping(
     context: AssetExecutionContext,
     raw_files_resource: OutputFilesResource,
@@ -53,6 +51,11 @@ def ssen_lv_feeder_postcode_mapping(
         metadata["weave/nunique_postcodes"] = df["postcode"].nunique()
 
     return MaterializeResult(metadata=metadata)
+
+
+ssen_lv_feeder_postcode_mapping_job = define_asset_job(
+    "ssen_lv_feeder_postcode_mapping_job", [ssen_lv_feeder_postcode_mapping]
+)
 
 
 @asset(
