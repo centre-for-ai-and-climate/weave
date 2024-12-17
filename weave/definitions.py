@@ -12,7 +12,11 @@ from .assets import (
 from .resources.ons import LiveONSAPIClient
 from .resources.output_files import OutputFilesResource
 from .resources.ssen import LiveSSENAPIClient
-from .sensors import ssen_lv_feeder_files_sensor, ssen_lv_feeder_monthly_parquet_sensor
+from .sensors import (
+    ssen_lv_feeder_files_sensor,
+    ssen_lv_feeder_monthly_parquet_sensor,
+    ssen_lv_feeder_postcode_mapping_sensor,
+)
 
 all_assets = load_assets_from_modules(
     [
@@ -105,6 +109,10 @@ def deployment_name():
 
 defs = Definitions(
     assets=all_assets,
-    sensors=[ssen_lv_feeder_files_sensor, ssen_lv_feeder_monthly_parquet_sensor],
+    sensors=[
+        ssen_lv_feeder_files_sensor,
+        ssen_lv_feeder_monthly_parquet_sensor,
+        ssen_lv_feeder_postcode_mapping_sensor,
+    ],
     resources=resources[deployment_name()],
 )

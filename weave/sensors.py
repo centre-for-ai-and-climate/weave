@@ -1,6 +1,7 @@
+from datetime import datetime
+
 from dagster import (
-    DagsterEventType,
-    EventRecordsFilter,
+    AssetRecordsFilter,
     RunRequest,
     SensorEvaluationContext,
     SensorResult,
@@ -14,6 +15,7 @@ from .assets.dno_lv_feeder_files import (
     ssen_lv_feeder_files_partitions_def,
 )
 from .assets.dno_lv_feeder_monthly_parquet import ssen_lv_feeder_monthly_parquet_job
+from .assets.ssen_substation_locations import ssen_lv_feeder_postcode_mapping_job
 from .resources.ssen import SSENAPIClient
 
 
@@ -62,15 +64,18 @@ def ssen_lv_feeder_monthly_parquet_sensor(context: SensorEvaluationContext):
         cursor = int(context.cursor)
         context.log.info(f"Parsed cursor: {cursor}")
     # Find new materialisations of the raw files
-    new_materialisations = context.instance.get_event_records(
-        EventRecordsFilter(
-            event_type=DagsterEventType.ASSET_MATERIALIZATION,
+    new_materialisations, _cursor, has_more = context.instance.fetch_materializations(
+        AssetRecordsFilter(
             asset_key=ssen_lv_feeder_files.key,
-            after_cursor=cursor,
+            after_storage_id=cursor,
         ),
-        limit=None,
+        # This can't be None, but we want all of them and it's never going to be many
+        # so I can't be bothered trying to iterate over pages
+        limit=999,
         ascending=True,
     )
+
+    assert has_more is False, "We should never have more than 999 new materialisations"
 
     context.log.info(
         f"Found {len(new_materialisations)} new materialisation events for raw SSEN lv feeder files since cursor"
@@ -94,3 +99,24 @@ def ssen_lv_feeder_monthly_parquet_sensor(context: SensorEvaluationContext):
         )
     else:
         return SkipReason(skip_message="No new files found")
+
+
+@sensor(
+    job=ssen_lv_feeder_postcode_mapping_job,
+    minimum_interval_seconds=60 * 60 * 24,
+)
+def ssen_lv_feeder_postcode_mapping_sensor(
+    context: SensorEvaluationContext, ssen_api_client: SSENAPIClient
+) -> SensorResult | SkipReason:
+    last_modified = ssen_api_client.get_last_modified("ssen_lv_feeder_postcode_mapping")
+    previous_last_modified = None
+    if context.cursor is not None and context.cursor != "":
+        previous_last_modified = datetime.fromisoformat(context.cursor)
+
+    if previous_last_modified is None or last_modified > previous_last_modified:
+        return SensorResult(
+            run_requests=[RunRequest(job_name="ssen_lv_feeder_postcode_mapping_job")],
+            cursor=last_modified.isoformat(),
+        )
+    else:
+        return SkipReason(skip_message="Feeder postcode mapping file has not changed")

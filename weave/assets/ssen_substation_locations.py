@@ -6,12 +6,14 @@ from dagster import (
     AutomationCondition,
     MaterializeResult,
     asset,
+    define_asset_job,
 )
 from dagster_pandas.data_frame import create_table_schema_metadata_from_dataframe
 from pyproj import Transformer
 from pyproj.transformer import TransformerGroup
 from shapely import Point
 
+from ..automation_conditions import needs_updating
 from ..core import DNO
 from ..resources.ons import ONSAPIClient
 from ..resources.output_files import OutputFilesResource
@@ -25,10 +27,7 @@ tg = TransformerGroup("EPSG:27700", "EPSG:4326")
 assert tg.best_available, "PyProj could not get the OSNT15 grid shift file for OSGB36 -> WGS84 conversion, this is essential for accurate location conversion"
 
 
-@asset(
-    description="SSEN's raw LV Feeder -> Postcode mapping file",
-    automation_condition=AutomationCondition.on_cron("@daily"),
-)
+@asset(description="SSEN's raw LV Feeder -> Postcode mapping file")
 def ssen_lv_feeder_postcode_mapping(
     context: AssetExecutionContext,
     raw_files_resource: OutputFilesResource,
@@ -54,10 +53,15 @@ def ssen_lv_feeder_postcode_mapping(
     return MaterializeResult(metadata=metadata)
 
 
+ssen_lv_feeder_postcode_mapping_job = define_asset_job(
+    "ssen_lv_feeder_postcode_mapping_job", [ssen_lv_feeder_postcode_mapping]
+)
+
+
 @asset(
     description="SSEN Substation location lookup table, built from their LV Feeder -> Substation mapping",
     deps=[ssen_lv_feeder_postcode_mapping, onspd],
-    automation_condition=AutomationCondition.eager(),
+    automation_condition=needs_updating(),
 )
 def ssen_substation_location_lookup_feeder_postcodes(
     context: AssetExecutionContext,
@@ -275,7 +279,7 @@ def ssen_transformer_load_model(
 @asset(
     description="SSEN substation lookup table, built from their Transformer Load Model",
     deps=[ssen_transformer_load_model],
-    automation_condition=AutomationCondition.eager(),
+    automation_condition=needs_updating(),
 )
 def ssen_substation_location_lookup_transformer_load_model(
     context: AssetExecutionContext,

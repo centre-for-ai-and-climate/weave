@@ -4,6 +4,7 @@ import zipfile
 import zlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import ClassVar
 
 import humanize
@@ -26,6 +27,7 @@ class SSENAPIClient(ConfigurableResource, ABC):
     )
     postcode_mapping_url: str = "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv"
     transformer_load_model_url: str = "https://data-api.ssen.co.uk/dataset/d1c4009b-4386-4208-a14f-cc09aeeb4777/resource/53b2b871-4c28-4ba9-85d4-c9ba6452aa15/download/onedrive_1_01-08-2024.zip"
+    ckan_base_url: str = "https://ckan-prod.sse.datopian.com/"
     # Matches the data "as-is". I wanted to add some space-saving optimizations
     # like dictionaries for the name columns, but it doesn't work with joining for some
     # reason.
@@ -46,6 +48,12 @@ class SSENAPIClient(ConfigurableResource, ABC):
             ("last_modified_time", pa.timestamp("ms", tz="UTC")),
         ]
     )
+    asset_ckan_mapping: ClassVar = {
+        "ssen_lv_feeder_postcode_mapping": {
+            "package_name": "ssen_smart_meter_prod_lv_feeder",
+            "resource_id": "1cce1fb4-d7f4-4309-b9e3-943bd4d18618",
+        }
+    }
 
     @abstractmethod
     def get_available_files(self) -> list[AvailableFile]:
@@ -125,6 +133,10 @@ class SSENAPIClient(ConfigurableResource, ABC):
         with gzip_ng_threaded.open(input_file, "rb", threads=pa.io_thread_count()) as f:
             return pa_csv.read_csv(f, convert_options=pyarrow_csv_convert_options)
 
+    @abstractmethod
+    def get_last_modified(self, asset) -> datetime | None:
+        pass
+
 
 class LiveSSENAPIClient(SSENAPIClient):
     # "https://ssen-smart-meter-prod.datopian.workers.dev/LV_FEEDER_USAGE/"
@@ -174,9 +186,32 @@ class LiveSSENAPIClient(SSENAPIClient):
                 f"{progress}% ({humanize.naturalsize(downloaded_size)}) downloaded"
             )
 
+    def get_last_modified(self, asset) -> datetime | None:
+        """Get the last modified time of a resource from the CKAN API"""
+        ckan_details = self.asset_ckan_mapping[asset]
+        url = f"{self.ckan_base_url}/api/3/action/package_show?id={ckan_details["package_name"]}"
+        r = requests.get(url, timeout=5)
+        r.raise_for_status()
+        response = r.json()
+        found_resource = None
+        for resource in response["result"]["resources"]:
+            if resource["id"] == ckan_details["resource_id"]:
+                found_resource = resource
+                break
+        if found_resource is None:
+            raise ValueError(
+                f"Resource {ckan_details["resource_id"]} not found in package {ckan_details["package_name"]}"
+            )
+        # CKAN seems a bit loose on timezones, but the best bet is it's UTC and we
+        # should only be comparing these times to each other so it doesn't matter
+        return datetime.fromisoformat(found_resource["last_modified"]).replace(
+            tzinfo=timezone.utc
+        )
+
 
 class StubSSENAPICLient(SSENAPIClient):
     file_to_download: str | None
+    last_modified: str | None
 
     def get_available_files(self) -> list[AvailableFile]:
         with open(self.available_files_url) as f:
@@ -190,3 +225,8 @@ class StubSSENAPICLient(SSENAPIClient):
                 )
             else:
                 output_file.write(f.read())
+
+    def get_last_modified(self, _asset) -> datetime | None:
+        if self.last_modified is None:
+            return None
+        return datetime.fromisoformat(self.last_modified)
