@@ -28,10 +28,12 @@ class SSENAPIClient(ConfigurableResource, ABC):
     postcode_mapping_url: str = "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_LOOKUP/LV_FEEDER_LOOKUP.csv"
     transformer_load_model_url: str = "https://data-api.ssen.co.uk/dataset/d1c4009b-4386-4208-a14f-cc09aeeb4777/resource/53b2b871-4c28-4ba9-85d4-c9ba6452aa15/download/onedrive_1_01-08-2024.zip"
     ckan_base_url: str = "https://ckan-prod.sse.datopian.com/"
-    # Matches the data "as-is". I wanted to add some space-saving optimizations
-    # like dictionaries for the name columns, but it doesn't work with joining for some
-    # reason.
-    # See https://github.com/pydantic/pydantic/issues/1927
+    asset_ckan_mapping: ClassVar = {
+        "ssen_lv_feeder_postcode_mapping": {
+            "package_name": "ssen_smart_meter_prod_lv_feeder",
+            "resource_id": "1cce1fb4-d7f4-4309-b9e3-943bd4d18618",
+        }
+    }
     lv_feeder_pyarrow_schema: ClassVar = pa.schema(
         [
             ("dataset_id", pa.string()),
@@ -48,12 +50,6 @@ class SSENAPIClient(ConfigurableResource, ABC):
             ("last_modified_time", pa.timestamp("ms", tz="UTC")),
         ]
     )
-    asset_ckan_mapping: ClassVar = {
-        "ssen_lv_feeder_postcode_mapping": {
-            "package_name": "ssen_smart_meter_prod_lv_feeder",
-            "resource_id": "1cce1fb4-d7f4-4309-b9e3-943bd4d18618",
-        }
-    }
 
     @abstractmethod
     def get_available_files(self) -> list[AvailableFile]:

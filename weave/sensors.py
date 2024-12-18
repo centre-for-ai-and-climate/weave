@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dagster import (
     AssetRecordsFilter,
@@ -10,12 +10,15 @@ from dagster import (
 )
 
 from .assets.dno_lv_feeder_files import (
+    nged_lv_feeder_files_job,
+    nged_lv_feeder_files_partitions_def,
     ssen_lv_feeder_files,
     ssen_lv_feeder_files_job,
     ssen_lv_feeder_files_partitions_def,
 )
 from .assets.dno_lv_feeder_monthly_parquet import ssen_lv_feeder_monthly_parquet_job
 from .assets.ssen_substation_locations import ssen_lv_feeder_postcode_mapping_job
+from .resources.nged import NGEDAPIClient
 from .resources.ssen import SSENAPIClient
 
 
@@ -44,6 +47,39 @@ def ssen_lv_feeder_files_sensor(
                 ssen_lv_feeder_files_partitions_def.build_add_request(new)
             ],
             cursor=latest_filename,
+        )
+    else:
+        return SkipReason(skip_message="No new files found")
+
+
+@sensor(
+    job=nged_lv_feeder_files_job,
+    minimum_interval_seconds=60 * 60 * 24,
+)
+def nged_lv_feeder_files_sensor(
+    context: SensorEvaluationContext,
+    nged_api_client: NGEDAPIClient,
+) -> SensorResult | SkipReason:
+    """Sensor for new files from NGED's raw data API.
+
+    NGED seem to release a large batch of new files at a time, and they can be out of
+    order (e.g. part0999 is released before part0998) so we can't just use the filenames
+    as a cursor. Luckily, their API gives created times for each file, so we can use
+    that instead.
+    """
+    available = nged_api_client.get_available_files()
+    latest = max(af.created for af in available)
+    cursor = datetime.min.replace(tzinfo=timezone.utc)
+    if context.cursor is not None and context.cursor != "":
+        cursor = datetime.fromisoformat(context.cursor)
+    new = [str(af.url) for af in available if af.created > cursor]
+    if len(new) > 0:
+        return SensorResult(
+            run_requests=[RunRequest(partition_key=url) for url in new],
+            dynamic_partitions_requests=[
+                nged_lv_feeder_files_partitions_def.build_add_request(new)
+            ],
+            cursor=latest.isoformat(),
         )
     else:
         return SkipReason(skip_message="No new files found")
