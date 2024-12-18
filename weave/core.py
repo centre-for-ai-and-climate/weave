@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from enum import Enum
 
 import pyarrow as pa
@@ -18,15 +19,17 @@ class DNO(Enum):
 class AvailableFile(BaseModel):
     filename: str
     url: HttpUrl
+    created: datetime = None
 
     def __hash__(self):
-        return hash((self.filename, self.url))
+        return hash((self.filename, self.url, self.created))
 
     def __eq__(self, other):
-        return self.filename == other.filename and self.url == other.url
-
-    def __lt__(self, other):
-        return self.filename < other.filename
+        return (
+            self.filename == other.filename
+            and self.url == other.url
+            and self.created == other.created
+        )
 
 
 lv_feeder_raw_pyarrow_schema = pa.schema(

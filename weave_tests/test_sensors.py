@@ -12,9 +12,11 @@ from weave.assets.dno_lv_feeder_files import (
     ssen_lv_feeder_files,
     ssen_lv_feeder_files_partitions_def,
 )
+from weave.resources.nged import StubNGEDAPICLient
 from weave.resources.output_files import OutputFilesResource
 from weave.resources.ssen import StubSSENAPICLient
 from weave.sensors import (
+    nged_lv_feeder_files_sensor,
     ssen_lv_feeder_files_sensor,
     ssen_lv_feeder_monthly_parquet_sensor,
     ssen_lv_feeder_postcode_mapping_sensor,
@@ -71,6 +73,39 @@ class TestSSENLVFeederFilesSensor:
     def test_no_results(self, instance, api_client):
         context = build_sensor_context(instance=instance, cursor="2024-09-27.csv")
         result = ssen_lv_feeder_files_sensor(context, ssen_api_client=api_client)
+        assert isinstance(result, SkipReason)
+
+
+class TestNGEDLVFeederFilesSensor:
+    @pytest.fixture
+    def api_client(self):
+        return StubNGEDAPICLient(
+            lv_feeder_datapackage_url=os.path.join(
+                FIXTURE_DIR, "nged", "datapackage.json"
+            ),
+        )
+
+    def test_clean_slate(self, instance, api_client):
+        context = build_sensor_context(instance=instance)
+        result = nged_lv_feeder_files_sensor(context, nged_api_client=api_client)
+        assert len(result.run_requests) == 1553
+        assert (
+            result.run_requests[0].partition_key
+            == "https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/105a7821-7f5c-4591-90e8-5915f253b1ff/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv"
+        )
+
+    def test_with_cursor(self, instance, api_client):
+        context = build_sensor_context(instance=instance, cursor="2024-11-30T19:53:57Z")
+        result = nged_lv_feeder_files_sensor(context, nged_api_client=api_client)
+        assert len(result.run_requests) == 1
+        assert (
+            result.run_requests[0].partition_key
+            == "https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/a34789d4-258e-4fa4-9232-0988d0980ad1/download/aggregated-smart-meter-data-lv-feeder-2024-10-part0227.csv"
+        )
+
+    def test_no_results(self, instance, api_client):
+        context = build_sensor_context(instance=instance, cursor="2024-12-18T00:00:00Z")
+        result = nged_lv_feeder_files_sensor(context, nged_api_client=api_client)
         assert isinstance(result, SkipReason)
 
 

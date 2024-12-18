@@ -11,6 +11,7 @@ from dagster import (
 from dagster_pandas.data_frame import create_table_schema_metadata_from_dataframe
 
 from ..core import DNO
+from ..resources.nged import NGEDAPIClient
 from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
 
@@ -57,6 +58,38 @@ def ssen_lv_feeder_files(
 ssen_lv_feeder_files_job = define_asset_job(
     "ssen_lv_feeder_files_job",
     [ssen_lv_feeder_files],
+    config={
+        "execution": {
+            "config": {
+                "multiprocess": {"max_concurrent": 3},
+            }
+        }
+    },
+)
+
+
+nged_lv_feeder_files_partitions_def = DynamicPartitionsDefinition(
+    name="nged_lv_feeder_files_partitions_def"
+)
+
+
+@asset(
+    description="LV Feeder files from NGED",
+    partitions_def=nged_lv_feeder_files_partitions_def,
+    retry_policy=RetryPolicy(max_retries=3, delay=10, backoff=Backoff.EXPONENTIAL),
+)
+def nged_lv_feeder_files(
+    context: AssetExecutionContext,
+    raw_files_resource: OutputFilesResource,
+    nged_api_client: NGEDAPIClient,
+):
+    metadata = {}
+    return MaterializeResult(metadata=metadata)
+
+
+nged_lv_feeder_files_job = define_asset_job(
+    "nged_lv_feeder_files_job",
+    [nged_lv_feeder_files],
     config={
         "execution": {
             "config": {

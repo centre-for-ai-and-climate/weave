@@ -1,6 +1,6 @@
 import os
 
-from dagster import Definitions, load_assets_from_modules
+from dagster import Definitions, EnvVar, load_assets_from_modules
 
 from .assets import (
     dno_lv_feeder_combined_geoparquet,
@@ -9,10 +9,12 @@ from .assets import (
     ons,
     ssen_substation_locations,
 )
+from .resources.nged import LiveNGEDAPIClient
 from .resources.ons import LiveONSAPIClient
 from .resources.output_files import OutputFilesResource
 from .resources.ssen import LiveSSENAPIClient
 from .sensors import (
+    nged_lv_feeder_files_sensor,
     ssen_lv_feeder_files_sensor,
     ssen_lv_feeder_monthly_parquet_sensor,
     ssen_lv_feeder_postcode_mapping_sensor,
@@ -45,6 +47,9 @@ resources = {
         ),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
+        "nged_api_client": LiveNGEDAPIClient(
+            api_token=EnvVar("NATIONAL_GRID_API_TOKEN")
+        ),
     },
     "dev_cloud": {
         "raw_files_resource": OutputFilesResource(url="s3://weave.energy-dev/data/raw"),
@@ -54,6 +59,9 @@ resources = {
         "output_files_resource": OutputFilesResource(url="s3://weave.energy-dev/beta"),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
+        "nged_api_client": LiveNGEDAPIClient(
+            api_token=EnvVar("NATIONAL_GRID_API_TOKEN")
+        ),
     },
     "branch": {
         "raw_files_resource": OutputFilesResource(
@@ -67,6 +75,9 @@ resources = {
         ),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
+        "nged_api_client": LiveNGEDAPIClient(
+            api_token=EnvVar("NATIONAL_GRID_API_TOKEN")
+        ),
     },
     "prod": {
         "raw_files_resource": OutputFilesResource(url="s3://weave.energy/data/raw"),
@@ -76,6 +87,9 @@ resources = {
         "output_files_resource": OutputFilesResource(url="s3://weave.energy/beta"),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
+        "nged_api_client": LiveNGEDAPIClient(
+            api_token=EnvVar("NATIONAL_GRID_API_TOKEN")
+        ),
     },
 }
 
@@ -113,6 +127,7 @@ defs = Definitions(
         ssen_lv_feeder_files_sensor,
         ssen_lv_feeder_monthly_parquet_sensor,
         ssen_lv_feeder_postcode_mapping_sensor,
+        nged_lv_feeder_files_sensor,
     ],
     resources=resources[deployment_name()],
 )
