@@ -16,7 +16,7 @@ from dagster import AssetExecutionContext, ConfigurableResource
 from fsspec.core import OpenFile
 from zlib_ng import gzip_ng_threaded, zlib_ng
 
-from ..core import AvailableFile, lv_feeder_raw_pyarrow_schema
+from ..core import AvailableFile
 
 
 class SSENAPIClient(ConfigurableResource, ABC):
@@ -34,6 +34,22 @@ class SSENAPIClient(ConfigurableResource, ABC):
             "resource_id": "1cce1fb4-d7f4-4309-b9e3-943bd4d18618",
         }
     }
+    lv_feeder_pyarrow_schema: ClassVar = pa.schema(
+        [
+            ("dataset_id", pa.string()),
+            ("dno_alias", pa.string()),
+            ("secondary_substation_id", pa.string()),
+            ("secondary_substation_name", pa.string()),
+            ("lv_feeder_id", pa.string()),
+            ("lv_feeder_name", pa.string()),
+            ("substation_geo_location", pa.string()),
+            ("aggregated_device_count_active", pa.float64()),
+            ("total_consumption_active_import", pa.float64()),
+            ("data_collection_log_timestamp", pa.timestamp("ms", tz="UTC")),
+            ("insert_time", pa.timestamp("ms", tz="UTC")),
+            ("last_modified_time", pa.timestamp("ms", tz="UTC")),
+        ]
+    )
 
     @abstractmethod
     def get_available_files(self) -> list[AvailableFile]:
@@ -94,7 +110,7 @@ class SSENAPIClient(ConfigurableResource, ABC):
     def lv_feeder_file_pyarrow_table(self, input_file: OpenFile):
         """Read an LV Feeder CSV file into a PyArrow Table."""
         pyarrow_csv_convert_options = pa_csv.ConvertOptions(
-            column_types=lv_feeder_raw_pyarrow_schema,
+            column_types=self.lv_feeder_pyarrow_schema,
             include_columns=[
                 "dataset_id",
                 "dno_alias",

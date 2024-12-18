@@ -3,6 +3,7 @@ import re
 import zlib
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from typing import ClassVar
 
 import humanize
 import pyarrow as pa
@@ -12,7 +13,7 @@ from dagster import AssetExecutionContext, ConfigurableResource
 from fsspec.core import OpenFile
 from zlib_ng import gzip_ng_threaded, zlib_ng
 
-from .ssen import AvailableFile, lv_feeder_raw_pyarrow_schema
+from .ssen import AvailableFile
 
 
 class NGEDAPIClient(ConfigurableResource, ABC):
@@ -21,6 +22,26 @@ class NGEDAPIClient(ConfigurableResource, ABC):
     lv_feeder_datapackage_url: str = "https://connecteddata.nationalgrid.co.uk/dataset/aggregated-smart-meter-data-lv-feeder/datapackage.json"
     ckan_base_url: str = "https://connecteddata.nationalgrid.co.uk"
     api_token: str
+
+    lv_feeder_pyarrow_schema: ClassVar = pa.schema(
+        [
+            ("dataset_id", pa.string()),
+            ("dno_alias", pa.string()),
+            ("secondary_substation_id", pa.string()),
+            ("secondary_substation_name", pa.string()),
+            ("LV_feeder_ID", pa.string()),
+            ("LV_feeder_name", pa.string()),
+            ("substation_geo_location", pa.string()),
+            ("aggregated_device_count_Active", pa.float64()),
+            ("Total_consumption_active_import", pa.float64()),
+            ("data_collection_log_timestamp", pa.timestamp("ms", tz="UTC")),
+            ("Insert_time", pa.timestamp("ms", tz="UTC")),
+            ("last_modified_time", pa.timestamp("ms", tz="UTC")),
+        ]
+    )
+
+    def _request_headers(self):
+        return {"Authorization": self.api_token}
 
     @abstractmethod
     def get_available_files(self) -> list[AvailableFile]:
@@ -67,19 +88,20 @@ class NGEDAPIClient(ConfigurableResource, ABC):
     def lv_feeder_file_pyarrow_table(self, input_file: OpenFile):
         """Read an LV Feeder CSV file into a PyArrow Table."""
         pyarrow_csv_convert_options = pa_csv.ConvertOptions(
-            column_types=lv_feeder_raw_pyarrow_schema,
+            column_types=self.lv_feeder_pyarrow_schema,
+            # Note seemingly random capitalisation of column names
             include_columns=[
                 "dataset_id",
                 "dno_alias",
                 "secondary_substation_id",
                 "secondary_substation_name",
-                "lv_feeder_id",
-                "lv_feeder_name",
+                "LV_feeder_ID",
+                "LV_feeder_name",
                 "substation_geo_location",
-                "aggregated_device_count_active",
-                "total_consumption_active_import",
+                "aggregated_device_count_Active",
+                "Total_consumption_active_import",
                 "data_collection_log_timestamp",
-                "insert_time",
+                "Insert_time",
                 "last_modified_time",
             ],
         )
@@ -89,8 +111,9 @@ class NGEDAPIClient(ConfigurableResource, ABC):
 
 class LiveNGEDAPIClient(NGEDAPIClient):
     def get_available_files(self) -> list[AvailableFile]:
-        headers = {"Authorization": self.api_token}
-        r = requests.get(self.lv_feeder_datapackage_url, timeout=5, headers=headers)
+        r = requests.get(
+            self.lv_feeder_datapackage_url, timeout=5, headers=self._request_headers()
+        )
         r.raise_for_status()
         return self._map_available_files(r.json())
 
@@ -103,7 +126,7 @@ class LiveNGEDAPIClient(NGEDAPIClient):
     ) -> None:
         """Stream a file from the given URL to the given file, optionally gzip
         compressing on the fly"""
-        with requests.get(url, stream=True) as r:
+        with requests.get(url, stream=True, headers=self._request_headers()) as r:
             r.raise_for_status()
             total_size = int(r.headers.get("content-length", 0))
             downloaded_size = 0

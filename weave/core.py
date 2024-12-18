@@ -32,24 +32,6 @@ class AvailableFile(BaseModel):
         )
 
 
-lv_feeder_raw_pyarrow_schema = pa.schema(
-    [
-        ("dataset_id", pa.string()),
-        ("dno_alias", pa.string()),
-        ("secondary_substation_id", pa.string()),
-        ("secondary_substation_name", pa.string()),
-        ("lv_feeder_id", pa.string()),
-        ("lv_feeder_name", pa.string()),
-        ("substation_geo_location", pa.string()),
-        ("aggregated_device_count_active", pa.float64()),
-        ("total_consumption_active_import", pa.float64()),
-        ("data_collection_log_timestamp", pa.timestamp("ms", tz="UTC")),
-        ("insert_time", pa.timestamp("ms", tz="UTC")),
-        ("last_modified_time", pa.timestamp("ms", tz="UTC")),
-    ]
-)
-
-
 lv_feeder_geoparquet_schema = pa.schema(
     [
         ("dataset_id", pa.string()),

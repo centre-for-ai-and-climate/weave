@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 import responses
 from dagster import build_asset_context
+from responses import matchers
 from zlib_ng import zlib_ng
 
 from weave.core import AvailableFile
@@ -90,7 +91,7 @@ class TestLiveSSENAPIClient:
                     output_file=f,
                     gzip=False,
                 )
-            # Using Pandas to read the gzipped CSV file to ensure it's valid
+            # Using Pandas to read the CSV file to ensure it's valid
             df = pd.read_csv(downloaded_file)
             assert len(df) == 10
 
@@ -191,6 +192,18 @@ class TestLiveNGEDAPIClient:
     def api_client(self):
         return LiveNGEDAPIClient(api_token="TEST")
 
+    @pytest.fixture
+    def csv_response(self):
+        with open(
+            os.path.join(
+                FIXTURE_DIR,
+                "nged",
+                "lv_feeder_files",
+                "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv",
+            )
+        ) as f:
+            yield f.read()
+
     def test_get_available_files(self, datapackage_response, api_client):
         with responses.RequestsMock() as mocked_responses:
             mocked_responses.get(
@@ -198,6 +211,7 @@ class TestLiveNGEDAPIClient:
                 body=datapackage_response,
                 status=200,
                 content_type="application/json",
+                match=[matchers.header_matcher({"Authorization": "TEST"})],
             )
             results = api_client.get_available_files()
             assert len(results) == 1553
@@ -211,3 +225,44 @@ class TestLiveNGEDAPIClient:
                 url="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/58e33df9-ca79-48b2-8ead-7446a502064a/download/aggregated-smart-meter-data-lv-feeder-2024-10-part0228.csv",
                 created=datetime(2024, 11, 30, 19, 53, 56, 287608, tzinfo=timezone.utc),
             )
+
+    def test_download_file_gzip(self, tmp_path, api_client, csv_response):
+        downloaded_file = (tmp_path / "downloaded.csv.gz").as_uri()
+        context = build_asset_context()
+        with responses.RequestsMock() as mocked_responses:
+            mocked_responses.get(
+                "https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/105a7821-7f5c-4591-90e8-5915f253b1ff/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv",
+                body=csv_response,
+                status=200,
+                match=[matchers.header_matcher({"Authorization": "TEST"})],
+            )
+            with fsspec.open(downloaded_file, "wb") as f:
+                api_client.download_file(
+                    context=context,
+                    url="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/105a7821-7f5c-4591-90e8-5915f253b1ff/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv",
+                    output_file=f,
+                )
+            # Using Pandas to read the gzipped CSV file to ensure it's valid
+            df = pd.read_csv(downloaded_file)
+            assert len(df) == 10
+
+    def test_lv_feeder_file_pyarrow_table(self, tmp_path, api_client):
+        input_file = os.path.join(
+            FIXTURE_DIR,
+            "nged",
+            "lv_feeder_files",
+            "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv",
+        )
+        with open(input_file, "rb") as f:
+            gzipped_file = (
+                tmp_path
+                / "aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv.gz"
+            )
+            with open(gzipped_file, "wb") as output_file:
+                output_file.write(
+                    zlib_ng.compress(f.read(), level=1, wbits=zlib_ng.MAX_WBITS | 16)
+                )
+
+        with open(gzipped_file, "rb") as f:
+            table = api_client.lv_feeder_file_pyarrow_table(f)
+            assert table.num_rows == 10

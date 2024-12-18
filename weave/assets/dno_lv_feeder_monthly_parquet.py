@@ -16,7 +16,7 @@ from dagster import (
 )
 
 from ..automation_conditions import lv_feeder_monthly_parquet_needs_updating
-from ..core import DNO, lv_feeder_raw_pyarrow_schema
+from ..core import DNO
 from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
 
@@ -54,7 +54,7 @@ def ssen_lv_feeder_monthly_parquet(
     location_lookup = _substation_location_lookup(staging_files_resource)
     context.log.info(f"Producing {monthly_file} from {len(daily_files)} daily files")
     with staging_files_resource.open(DNO.SSEN.value, monthly_file, mode="wb") as out:
-        parquet_writer = pq.ParquetWriter(out, lv_feeder_raw_pyarrow_schema)
+        parquet_writer = pq.ParquetWriter(out, ssen_api_client.lv_feeder_pyarrow_schema)
         metadata["dagster/uri"] = staging_files_resource.path(
             DNO.SSEN.value, monthly_file
         )

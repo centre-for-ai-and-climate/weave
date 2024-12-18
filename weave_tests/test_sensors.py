@@ -80,6 +80,7 @@ class TestNGEDLVFeederFilesSensor:
     @pytest.fixture
     def api_client(self):
         return StubNGEDAPICLient(
+            api_token="TEST",
             lv_feeder_datapackage_url=os.path.join(
                 FIXTURE_DIR, "nged", "datapackage.json"
             ),
