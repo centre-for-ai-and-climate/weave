@@ -16,7 +16,8 @@ from dagster import (
 )
 
 from ..automation_conditions import lv_feeder_monthly_parquet_needs_updating
-from ..core import DNO
+from ..core import DNO, lv_feeder_parquet_schema
+from ..resources.nged import NGEDAPIClient
 from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
 
@@ -54,16 +55,16 @@ def ssen_lv_feeder_monthly_parquet(
     location_lookup = _substation_location_lookup(staging_files_resource)
     context.log.info(f"Producing {monthly_file} from {len(daily_files)} daily files")
     with staging_files_resource.open(DNO.SSEN.value, monthly_file, mode="wb") as out:
-        parquet_writer = pq.ParquetWriter(out, ssen_api_client.lv_feeder_pyarrow_schema)
+        parquet_writer = pq.ParquetWriter(out, lv_feeder_parquet_schema)
         metadata["dagster/uri"] = staging_files_resource.path(
             DNO.SSEN.value, monthly_file
         )
         metadata["dagster/row_count"] = 0
-        metadata["weave/nunique_feeders"] = 0
+        unique_feeders = set()
         for csv in daily_files:
             try:
                 table = _read_csv_into_pyarrow_table(
-                    context, raw_files_resource, ssen_api_client, csv
+                    context, DNO.SSEN, raw_files_resource, ssen_api_client, csv
                 )
                 table = table.append_column(
                     "substation_nrn",
@@ -86,15 +87,14 @@ def ssen_lv_feeder_monthly_parquet(
                 )
 
                 metadata["dagster/row_count"] += table.num_rows
-                metadata["weave/nunique_feeders"] += pc.count_distinct(
-                    table.column("dataset_id")
-                ).as_py()
+                unique_feeders.update(pc.unique(table.column("dataset_id")).to_pylist())
                 parquet_writer.write_table(table)
             except FileNotFoundError:
                 context.log.info(
                     f"Ignoring missing SSEN daily file {csv} when building monthly file {monthly_file}"
                 )
         parquet_writer.close()
+        metadata["weave/nunique_feeders"] = len(unique_feeders)
 
     if metadata["dagster/row_count"] == 0:
         context.log.info(f"No data found for {monthly_file}, deleting empty file")
@@ -113,11 +113,18 @@ def _ssen_files_for_month(year: int, month: int):
 
 
 def _read_csv_into_pyarrow_table(
-    context, raw_files_resource, ssen_api_client, filename
+    context: AssetExecutionContext,
+    dno: DNO,
+    raw_files_resource: OutputFilesResource,
+    api_client: SSENAPIClient | NGEDAPIClient,
+    filename: str,
 ):
-    context.log.info(f"Processing {filename}")
-    with raw_files_resource.open(DNO.SSEN.value, filename, mode="rb") as gzipf:
-        return ssen_api_client.lv_feeder_file_pyarrow_table(gzipf)
+    """Shared helper function for opening CSV files from DNOs as a pyarrow table."""
+    context.log.info(f"Opening {filename}")
+    with raw_files_resource.open(dno.value, filename, mode="rb") as gzipf:
+        # TODO: this API isn't really codified - do we need a generic DNO API client
+        # abstract class?
+        return api_client.lv_feeder_file_pyarrow_table(gzipf)
 
 
 def _substation_location_lookup(
@@ -162,4 +169,74 @@ def _substation_location_lookup(
 ssen_lv_feeder_monthly_parquet_job = define_asset_job(
     "ssen_lv_feeder_monthly_parquet_job",
     [ssen_lv_feeder_monthly_parquet],
+)
+
+
+@asset(
+    description="""Monthly partitioned parquet files from NGED's raw low-voltage feeder data""",
+    partitions_def=MonthlyPartitionsDefinition(start_date="2024-01-01"),
+    deps=[
+        # Each partition is not really dependent on all of the partitions of the raw
+        # files, but we don't have a way to express that in Dagster yet. This stops it
+        # breaking when it tries to check there are valid partitions.
+        AssetDep("nged_lv_feeder_files", partition_mapping=AllPartitionMapping())
+    ],
+)
+def nged_lv_feeder_monthly_parquet(
+    context: AssetExecutionContext,
+    raw_files_resource: OutputFilesResource,
+    staging_files_resource: OutputFilesResource,
+    nged_api_client: NGEDAPIClient,
+) -> MaterializeResult:
+    metadata = {}
+    partition_date = datetime.strptime(context.partition_key, "%Y-%m-%d")
+    year = partition_date.year
+    month = partition_date.month
+    monthly_file = f"{year}-{month:02d}.parquet"
+    part_files = _nged_files_for_month(year, month)
+    context.log.info(f"Producing {monthly_file} from {len(part_files)} part files")
+    with staging_files_resource.open(DNO.NGED.value, monthly_file, mode="wb") as out:
+        parquet_writer = pq.ParquetWriter(out, lv_feeder_parquet_schema)
+        metadata["dagster/uri"] = staging_files_resource.path(
+            DNO.NGED.value, monthly_file
+        )
+        metadata["dagster/row_count"] = 0
+        unique_feeders = set()
+        for csv in part_files:
+            try:
+                table = _read_csv_into_pyarrow_table(
+                    context, DNO.NGED, raw_files_resource, nged_api_client, csv
+                )
+
+                # TODO: rewrite the NGED column names here
+
+                metadata["dagster/row_count"] += table.num_rows
+
+                # TODO: dataset_id is not a unique feeder id now, need to concat substation and feeder ids
+                unique_feeders.update(pc.unique(table.column("dataset_id")).to_pylist())
+                parquet_writer.write_table(table)
+            except FileNotFoundError:
+                context.log.info(
+                    f"Ignoring missing SSEN daily file {csv} when building monthly file {monthly_file}"
+                )
+        parquet_writer.close()
+
+        metadata["weave/nunique_feeders"] += len(unique_feeders)
+
+    if metadata["dagster/row_count"] == 0:
+        context.log.info(f"No data found for {monthly_file}, deleting empty file")
+        staging_files_resource.delete(DNO.SSEN.value, monthly_file)
+    return MaterializeResult(metadata=metadata)
+
+
+def _nged_files_for_month(year: int, month: int):
+    """NGED produces a random number of files per month, split into parts, so we need
+    to query dagster to find out what we have."""
+    # TODO - this looks a lot like the sensor code, can we share it?
+    return []
+
+
+nged_lv_feeder_monthly_parquet_job = define_asset_job(
+    "nged_lv_feeder_monthly_parquet_job",
+    [nged_lv_feeder_monthly_parquet],
 )
