@@ -59,7 +59,7 @@ def ssen_lv_feeder_monthly_parquet(
             DNO.SSEN.value, monthly_file
         )
         metadata["dagster/row_count"] = 0
-        metadata["weave/nunique_feeders"] = 0
+        unique_feeders = set()
         for csv in daily_files:
             try:
                 table = _read_csv_into_pyarrow_table(
@@ -86,15 +86,14 @@ def ssen_lv_feeder_monthly_parquet(
                 )
 
                 metadata["dagster/row_count"] += table.num_rows
-                metadata["weave/nunique_feeders"] += pc.count_distinct(
-                    table.column("dataset_id")
-                ).as_py()
+                unique_feeders.update(pc.unique(table.column("dataset_id")).to_pylist())
                 parquet_writer.write_table(table)
             except FileNotFoundError:
                 context.log.info(
                     f"Ignoring missing SSEN daily file {csv} when building monthly file {monthly_file}"
                 )
         parquet_writer.close()
+        metadata["weave/nunique_feeders"] = len(unique_feeders)
 
     if metadata["dagster/row_count"] == 0:
         context.log.info(f"No data found for {monthly_file}, deleting empty file")
