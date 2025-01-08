@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from dagster import (
-    AssetRecordsFilter,
+    AssetKey,
     RunRequest,
     SensorEvaluationContext,
     SensorResult,
@@ -22,6 +22,7 @@ from .assets.dno_lv_feeder_monthly_parquet import (
     ssen_lv_feeder_monthly_parquet_job,
 )
 from .assets.ssen_substation_locations import ssen_lv_feeder_postcode_mapping_job
+from .dagster_helpers import get_materialisations
 from .resources.nged import NGEDAPIClient
 from .resources.ssen import SSENAPIClient
 
@@ -146,33 +147,17 @@ def nged_lv_feeder_monthly_parquet_sensor(context: SensorEvaluationContext):
         return SkipReason(skip_message="No new files found")
 
 
-def _get_new_materialisations(context, asset_key):
+def _get_new_materialisations(context: SensorEvaluationContext, asset_key: AssetKey):
     # Turn the string cursor into one we can query with. Figured out from reading the
     # source code: https://docs.dagster.io/_modules/dagster/_core/event_api
-    cursor = None
+    after_storage_id = None
     if context.cursor:
-        cursor = int(context.cursor)
-        context.log.info(f"Parsed cursor: {cursor}")
+        after_storage_id = int(context.cursor)
+        context.log.info(f"Parsed storage id from context cursor: {after_storage_id}")
 
-    # Find new materialisations of the raw files
-    new_materialisations, _cursor, has_more = context.instance.fetch_materializations(
-        AssetRecordsFilter(
-            asset_key=asset_key,
-            after_storage_id=cursor,
-        ),
-        # This can't be None, but we want all of them and it's never going to be many
-        # so I can't be bothered trying to iterate over pages
-        limit=9999,
-        ascending=True,
+    return get_materialisations(
+        context.instance, context.log, asset_key, after_storage_id
     )
-
-    assert has_more is False, "We should never have more than 9999 new materialisations"
-
-    context.log.info(
-        f"Found {len(new_materialisations)} new materialisation events for {asset_key} since cursor {cursor}"
-    )
-
-    return new_materialisations
 
 
 @sensor(

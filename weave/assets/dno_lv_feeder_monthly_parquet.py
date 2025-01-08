@@ -8,9 +8,7 @@ from dagster import (
     AllPartitionMapping,
     AssetDep,
     AssetExecutionContext,
-    AssetRecordsFilter,
     AssetSelection,
-    DagsterInstance,
     MaterializeResult,
     MonthlyPartitionsDefinition,
     asset,
@@ -19,6 +17,7 @@ from dagster import (
 
 from ..automation_conditions import lv_feeder_monthly_parquet_needs_updating
 from ..core import DNO, lv_feeder_parquet_schema
+from ..dagster_helpers import get_materialisations
 from ..resources.nged import NGEDAPIClient
 from ..resources.output_files import OutputFilesResource
 from ..resources.ssen import SSENAPIClient
@@ -194,9 +193,7 @@ def nged_lv_feeder_monthly_parquet(
     year = partition_date.year
     month = partition_date.month
     monthly_file = f"{year}-{month:02d}.parquet"
-    part_files = _nged_files_for_month(
-        context.instance, nged_api_client, context.partition_key
-    )
+    part_files = _nged_files_for_month(context, nged_api_client, context.partition_key)
     context.log.info(f"Producing {monthly_file} from {len(part_files)} part files")
     if len(part_files) == 0:
         context.log.info(f"No data found for {monthly_file}, not creating parquet file")
@@ -249,24 +246,17 @@ def nged_lv_feeder_monthly_parquet(
 
 
 def _nged_files_for_month(
-    instance: DagsterInstance, client: NGEDAPIClient, partition_key: str
+    context: AssetExecutionContext, client: NGEDAPIClient, partition_key: str
 ) -> set[str]:
     """NGED produces a random number of files per month, split into parts, so we need
     to query dagster to find out what we have."""
     files = set()
-    has_more = True
-    cursor = None
-    while has_more:
-        materialisations, cursor, has_more = instance.fetch_materializations(
-            AssetRecordsFilter(
-                asset_key=nged_lv_feeder_files.key, after_storage_id=cursor
-            ),
-            limit=9999,
-            ascending=True,
-        )
-        for m in materialisations:
-            if client.month_partition_from_url(m.partition_key) == partition_key:
-                files.add(f"{client.filename_for_url(m.partition_key)}.gz")
+    materialisations = get_materialisations(
+        context.instance, context.log, nged_lv_feeder_files.key
+    )
+    for m in materialisations:
+        if client.month_partition_from_url(m.partition_key) == partition_key:
+            files.add(f"{client.filename_for_url(m.partition_key)}.gz")
 
     return files
 
