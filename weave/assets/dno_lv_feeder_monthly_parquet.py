@@ -258,7 +258,8 @@ def _nged_files_for_month(
         if client.month_partition_from_url(m.partition_key) == partition_key:
             files.add(f"{client.filename_for_url(m.partition_key)}.gz")
 
-    return files
+    sorted_files = sorted(files)
+    return sorted_files
 
 
 nged_lv_feeder_monthly_parquet_job = define_asset_job(
