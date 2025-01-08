@@ -2,21 +2,18 @@ import os
 
 import pytest
 from dagster import (
+    AssetKey,
+    AssetMaterialization,
     DagsterInstance,
     SkipReason,
     build_sensor_context,
-    materialize_to_memory,
 )
 
-from weave.assets.dno_lv_feeder_files import (
-    ssen_lv_feeder_files,
-    ssen_lv_feeder_files_partitions_def,
-)
-from weave.resources.nged import StubNGEDAPICLient
-from weave.resources.output_files import OutputFilesResource
+from weave.resources.nged import StubNGEDAPIClient
 from weave.resources.ssen import StubSSENAPICLient
 from weave.sensors import (
     nged_lv_feeder_files_sensor,
+    nged_lv_feeder_monthly_parquet_sensor,
     ssen_lv_feeder_files_sensor,
     ssen_lv_feeder_monthly_parquet_sensor,
     ssen_lv_feeder_postcode_mapping_sensor,
@@ -79,8 +76,7 @@ class TestSSENLVFeederFilesSensor:
 class TestNGEDLVFeederFilesSensor:
     @pytest.fixture
     def api_client(self):
-        return StubNGEDAPICLient(
-            api_token="TEST",
+        return StubNGEDAPIClient(
             lv_feeder_datapackage_url=os.path.join(
                 FIXTURE_DIR, "nged", "datapackage.json"
             ),
@@ -111,57 +107,31 @@ class TestNGEDLVFeederFilesSensor:
 
 
 class TestSSENLVFeederMonthlyParquetSensor:
-    @pytest.fixture
-    def api_client(self):
-        return StubSSENAPICLient(
-            file_to_download=os.path.join(
-                FIXTURE_DIR, "ssen", "lv_feeder_files", "2024-02-12_head.csv"
-            ),
-        )
-
-    @pytest.fixture
-    def raw_files_resource(self, tmp_path):
-        output_dir = tmp_path / "raw" / "ssen"
-        output_dir.mkdir(parents=True)
-        return OutputFilesResource(url=tmp_path.as_uri())
-
     def test_clean_slate(self, instance):
         context = build_sensor_context(instance=instance)
         result = ssen_lv_feeder_monthly_parquet_sensor(context)
         assert isinstance(result, SkipReason)
 
     @pytest.fixture
-    def materialize_raw_file(self, instance, api_client, raw_files_resource):
-        def _materialize_raw_file(raw_file):
-            materialize_to_memory(
-                [ssen_lv_feeder_files],
-                instance=instance,
-                partition_key=raw_file,
-                resources={
-                    "ssen_api_client": api_client,
-                    "raw_files_resource": raw_files_resource,
-                },
+    def materialize(self, instance):
+        def _materialize(partition_key):
+            instance.report_runless_asset_event(
+                AssetMaterialization(
+                    asset_key=AssetKey("ssen_lv_feeder_files"), partition=partition_key
+                )
             )
 
-        return _materialize_raw_file
+        return _materialize
 
-    def test_with_cursor(self, instance, materialize_raw_file):
+    def test_with_cursor(self, instance, materialize):
         context = build_sensor_context(instance=instance)
-        instance.add_dynamic_partitions(
-            ssen_lv_feeder_files_partitions_def.name,
-            [
-                "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-02-12.csv",
-                "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-02-13.csv",
-                "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-03-01.csv",
-            ],
-        )
-        materialize_raw_file(
+        materialize(
             "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-02-12.csv"
         )
-        materialize_raw_file(
+        materialize(
             "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-02-13.csv"
         )
-        materialize_raw_file(
+        materialize(
             "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-03-01.csv"
         )
         result = ssen_lv_feeder_monthly_parquet_sensor(context)
@@ -172,7 +142,7 @@ class TestSSENLVFeederMonthlyParquetSensor:
 
         # When we re-materialise a daily partition, we should get a run request to
         # rebuild the relevant monthly parquet file
-        materialize_raw_file(
+        materialize(
             "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2024-02-13.csv"
         )
 
@@ -183,14 +153,7 @@ class TestSSENLVFeederMonthlyParquetSensor:
 
         # When we add a new file for a new month, we should get a run request to
         # rebuild the relevant monthly parquet file
-
-        instance.add_dynamic_partitions(
-            ssen_lv_feeder_files_partitions_def.name,
-            [
-                "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2023-12-10.csv"
-            ],
-        )
-        materialize_raw_file(
+        materialize(
             "https://ssen-smart-meter-prod.portaljs.com/LV_FEEDER_USAGE/2023-12-10.csv"
         )
 
@@ -230,3 +193,62 @@ class TestSSENLVFeederPostcodeMappingSensor:
             new_context, ssen_api_client=api_client
         )
         assert isinstance(result, SkipReason)
+
+
+class TestNGEDLVFeederMonthlyParquetSensor:
+    @pytest.fixture
+    def materialize(self, instance):
+        def _materialize(partition_key):
+            instance.report_runless_asset_event(
+                AssetMaterialization(
+                    asset_key=AssetKey("nged_lv_feeder_files"), partition=partition_key
+                )
+            )
+
+        return _materialize
+
+    def test_clean_slate(self, instance):
+        context = build_sensor_context(instance=instance)
+        result = nged_lv_feeder_monthly_parquet_sensor(context)
+        assert isinstance(result, SkipReason)
+
+    def test_with_cursor(self, instance, materialize):
+        context = build_sensor_context(instance=instance)
+
+        materialize(
+            "https://example.com/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv"
+        )
+        materialize(
+            "https://example.com/aggregated-smart-meter-data-lv-feeder-2024-01-part0001.csv"
+        )
+        materialize(
+            "https://example.com/aggregated-smart-meter-data-lv-feeder-2024-02-part0000.csv"
+        )
+
+        result = nged_lv_feeder_monthly_parquet_sensor(context)
+        assert len(result.run_requests) == 2
+        # Multiple new partitions in a month should be deduped
+        assert result.run_requests[0].partition_key == "2024-01-01"
+        assert result.run_requests[1].partition_key == "2024-02-01"
+
+        # When we re-materialise a daily partition, we should get a run request to
+        # rebuild the relevant monthly parquet file
+        materialize(
+            "https://example.com/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv"
+        )
+
+        new_context = build_sensor_context(instance=instance, cursor=result.cursor)
+        result = nged_lv_feeder_monthly_parquet_sensor(new_context)
+        assert len(result.run_requests) == 1
+        assert result.run_requests[0].partition_key == "2024-01-01"
+
+        # When we add a new file for a new month, we should get a run request to
+        # rebuild the relevant monthly parquet file
+        materialize(
+            "https://example.com/aggregated-smart-meter-data-lv-feeder-2023-12-part0000.csv"
+        )
+
+        new_context = build_sensor_context(instance=instance, cursor=result.cursor)
+        result = nged_lv_feeder_monthly_parquet_sensor(new_context)
+        assert len(result.run_requests) == 1
+        assert result.run_requests[0].partition_key == "2023-12-01"

@@ -22,8 +22,8 @@ class NGEDAPIClient(ConfigurableResource, ABC):
     lv_feeder_datapackage_url: str = "https://connecteddata.nationalgrid.co.uk/dataset/aggregated-smart-meter-data-lv-feeder/datapackage.json"
     ckan_base_url: str = "https://connecteddata.nationalgrid.co.uk"
     api_token: str
-
-    lv_feeder_pyarrow_schema: ClassVar = pa.schema(
+    # Note seemingly random capitalisation of column names
+    lv_feeder_csv_schema: ClassVar = pa.schema(
         [
             ("dataset_id", pa.string()),
             ("dno_alias", pa.string()),
@@ -64,8 +64,9 @@ class NGEDAPIClient(ConfigurableResource, ABC):
     @classmethod
     def month_partition_from_url(cls, url: str) -> str:
         filename = cls.filename_for_url(url)
-        bare_filename = re.sub(r"-part\d{4}\.csv$", "", filename)
-        year, month, _day = bare_filename.split("-")
+        parts = filename.split("-")
+        year = parts[6]
+        month = parts[7]
         return f"{year}-{month}-01"
 
     def _map_available_files(self, api_response: dict) -> list[AvailableFile]:
@@ -88,22 +89,8 @@ class NGEDAPIClient(ConfigurableResource, ABC):
     def lv_feeder_file_pyarrow_table(self, input_file: OpenFile):
         """Read an LV Feeder CSV file into a PyArrow Table."""
         pyarrow_csv_convert_options = pa_csv.ConvertOptions(
-            column_types=self.lv_feeder_pyarrow_schema,
-            # Note seemingly random capitalisation of column names
-            include_columns=[
-                "dataset_id",
-                "dno_alias",
-                "secondary_substation_id",
-                "secondary_substation_name",
-                "LV_feeder_ID",
-                "LV_feeder_name",
-                "substation_geo_location",
-                "aggregated_device_count_Active",
-                "Total_consumption_active_import",
-                "data_collection_log_timestamp",
-                "Insert_time",
-                "last_modified_time",
-            ],
+            column_types=self.lv_feeder_csv_schema,
+            include_columns=self.lv_feeder_csv_schema.names,
         )
         with gzip_ng_threaded.open(input_file, "rb", threads=pa.io_thread_count()) as f:
             return pa_csv.read_csv(f, convert_options=pyarrow_csv_convert_options)
@@ -159,8 +146,9 @@ class LiveNGEDAPIClient(NGEDAPIClient):
             )
 
 
-class StubNGEDAPICLient(NGEDAPIClient):
+class StubNGEDAPIClient(NGEDAPIClient):
     file_to_download: str | None
+    api_token: str = "STUB_API_TOKEN"
 
     def get_available_files(self) -> list[AvailableFile]:
         with open(self.lv_feeder_datapackage_url) as f:

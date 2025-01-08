@@ -6,7 +6,7 @@ import pytest
 from dagster import build_asset_context
 
 from weave.assets.dno_lv_feeder_files import nged_lv_feeder_files, ssen_lv_feeder_files
-from weave.resources.nged import StubNGEDAPICLient
+from weave.resources.nged import StubNGEDAPIClient
 from weave.resources.output_files import OutputFilesResource
 from weave.resources.ssen import StubSSENAPICLient
 
@@ -68,7 +68,7 @@ class TestNGEDLVFeederFiles:
             partition_key="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/105a7821-7f5c-4591-90e8-5915f253b1ff/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv"
         )
         raw_files_resource = OutputFilesResource(url=tmp_path.as_uri())
-        api_client = StubNGEDAPICLient(
+        api_client = StubNGEDAPIClient(
             api_token="TEST",
             file_to_download=os.path.join(
                 FIXTURE_DIR,

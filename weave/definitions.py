@@ -15,6 +15,7 @@ from .resources.output_files import OutputFilesResource
 from .resources.ssen import LiveSSENAPIClient
 from .sensors import (
     nged_lv_feeder_files_sensor,
+    nged_lv_feeder_monthly_parquet_sensor,
     ssen_lv_feeder_files_sensor,
     ssen_lv_feeder_monthly_parquet_sensor,
     ssen_lv_feeder_postcode_mapping_sensor,
@@ -128,6 +129,7 @@ defs = Definitions(
         ssen_lv_feeder_monthly_parquet_sensor,
         ssen_lv_feeder_postcode_mapping_sensor,
         nged_lv_feeder_files_sensor,
+        nged_lv_feeder_monthly_parquet_sensor,
     ],
     resources=resources[deployment_name()],
 )
