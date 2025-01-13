@@ -106,26 +106,26 @@ def test_lv_feeder_combined_geoparquet(tmp_path):
     assert gdf.iloc[0].data_collection_log_timestamp == pd.Timestamp(
         "2024-02-01 00:30:00+0000", tz="UTC"
     )
-    assert gdf.iloc[0].secondary_substation_unique_id == "0002002001"
-    assert gdf.iloc[0].lv_feeder_unique_id == "000200200101"
+    assert gdf.iloc[0].secondary_substation_unique_id == "SSEN-0002002001"
+    assert gdf.iloc[0].lv_feeder_unique_id == "SSEN-000200200101"
 
     assert gdf.iloc[1].data_collection_log_timestamp == pd.Timestamp(
         "2024-02-01 00:30:00+0000", tz="UTC"
     )
-    assert gdf.iloc[1].secondary_substation_unique_id == "0002002001"
-    assert gdf.iloc[1].lv_feeder_unique_id == "000200200102"
+    assert gdf.iloc[1].secondary_substation_unique_id == "SSEN-0002002001"
+    assert gdf.iloc[1].lv_feeder_unique_id == "SSEN-000200200102"
 
     assert gdf.iloc[2].data_collection_log_timestamp == pd.Timestamp(
         "2024-02-01 00:30:00+0000", tz="UTC"
     )
-    assert gdf.iloc[2].secondary_substation_unique_id == "0002002002"
-    assert gdf.iloc[2].lv_feeder_unique_id == "000200200201"
+    assert gdf.iloc[2].secondary_substation_unique_id == "SSEN-0002002002"
+    assert gdf.iloc[2].lv_feeder_unique_id == "SSEN-000200200201"
 
     assert gdf.iloc[-1].data_collection_log_timestamp == pd.Timestamp(
         "2024-02-29 00:30:00+0000", tz="UTC"
     )
-    assert gdf.iloc[-1].secondary_substation_unique_id == "0002002003"
-    assert gdf.iloc[-1].lv_feeder_unique_id == "000200200302"
+    assert gdf.iloc[-1].secondary_substation_unique_id == "SSEN-0002002003"
+    assert gdf.iloc[-1].lv_feeder_unique_id == "SSEN-000200200302"
 
     # Locations are parsed to geometries correctly (including empty ones)
     assert gdf.iloc[0].geometry == Point(-2.43, 50.79)
@@ -138,8 +138,8 @@ def test_lv_feeder_combined_geoparquet(tmp_path):
 
     # SSEN substations have their ids taken from the dataset_id
     assert gdf.iloc[0].dataset_id == "000200200101"
-    assert gdf.iloc[0].secondary_substation_unique_id == "0002002001"
-    assert gdf.iloc[0].lv_feeder_unique_id == "000200200101"
+    assert gdf.iloc[0].secondary_substation_unique_id == "SSEN-0002002001"
+    assert gdf.iloc[0].lv_feeder_unique_id == "SSEN-000200200101"
 
 
 def test_lv_feeder_combined_geoparquet_handles_missing_input(tmp_path):
