@@ -42,6 +42,9 @@ def lv_feeder_combined_geoparquet(
     month = partition_date.month
     monthly_file = f"{year}-{month:02d}.parquet"
 
+    unique_feeder_ids = set()
+    unique_substation_ids = set()
+
     try:
         with output_files_resource.open("smart-meter", monthly_file, mode="wb") as out:
             parquet_writer = _create_parquet_writer(out)
@@ -69,7 +72,16 @@ def lv_feeder_combined_geoparquet(
                         ]
                     )
                     parquet_writer.write_table(table)
-                    metadata = _update_metadata_for_batch(metadata, table)
+
+                    metadata["dagster/row_count"] += table.num_rows
+                    unique_feeder_ids.update(
+                        pc.unique(table.column("lv_feeder_unique_id")).to_pylist()
+                    )
+                    unique_substation_ids.update(
+                        pc.unique(
+                            table.column("secondary_substation_unique_id")
+                        ).to_pylist()
+                    )
 
                     processed_rows += table.num_rows
                     percentage_processed = int(processed_rows / total_rows * 100)
@@ -83,6 +95,9 @@ def lv_feeder_combined_geoparquet(
             f"Attempting to delete {output_files_resource.path("smart-meter", monthly_file)}"
         )
         output_files_resource.delete("smart-meter", monthly_file)
+
+    metadata["weave/nunique_feeders"] = len(unique_feeder_ids)
+    metadata["weave/nunique_substations"] = len(unique_substation_ids)
 
     return MaterializeResult(metadata=metadata)
 
@@ -120,18 +135,6 @@ def _generate_parquet_batches(
             "substation_geo_location",
         ],
     )
-
-
-def _update_metadata_for_batch(metadata: dict, table: pa.Table) -> dict:
-    metadata["dagster/row_count"] += table.num_rows
-    metadata["weave/nunique_feeders"] += pc.count_distinct(
-        table.column("lv_feeder_unique_id")
-    ).as_py()
-    metadata["weave/nunique_substations"] += pc.count_distinct(
-        table.column("secondary_substation_unique_id")
-    ).as_py()
-
-    return metadata
 
 
 def _ssen_to_combined_geoparquet(

@@ -76,9 +76,13 @@ def test_lv_feeder_combined_geoparquet(tmp_path):
     staging_files_resource = OutputFilesResource(url=(tmp_path / "staging").as_uri())
     output_files_resource = OutputFilesResource(url=(tmp_path / "output").as_uri())
 
-    lv_feeder_combined_geoparquet(
+    result = lv_feeder_combined_geoparquet(
         context, staging_files_resource, output_files_resource
     )
+
+    assert result.metadata["dagster/row_count"] == 6 * 29
+    assert result.metadata["weave/nunique_feeders"] == 6
+    assert result.metadata["weave/nunique_substations"] == 3
 
     gdf = gpd.read_parquet(output_dir / "smart-meter" / "2024-02.parquet")
     assert len(gdf) == 6 * 29  # 6 feeders * 29 days (2024 was a leap year)
