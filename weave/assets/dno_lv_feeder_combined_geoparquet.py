@@ -1,4 +1,5 @@
-from datetime import datetime
+import calendar
+from datetime import datetime, timedelta, timezone
 from typing import Generator
 
 import geopandas as gpd
@@ -41,6 +42,7 @@ def lv_feeder_combined_geoparquet(
     year = partition_date.year
     month = partition_date.month
     monthly_file = f"{year}-{month:02d}.parquet"
+    days_in_month = calendar.monthrange(year, month)[1]
 
     unique_feeder_ids = set()
     unique_substation_ids = set()
@@ -51,43 +53,58 @@ def lv_feeder_combined_geoparquet(
             metadata["dagster/uri"] = output_files_resource.path(
                 "smart-meter", monthly_file
             )
-            for dno in [DNO.SSEN]:
-                with staging_files_resource.open(
-                    dno.value, monthly_file, mode="rb"
-                ) as in_file:
-                    parquet_file = pq.ParquetFile(in_file)
-                    total_rows = parquet_file.metadata.num_rows
-                    processed_rows = 0
-                    context.log.info(
-                        f"Processing file: {in_file}, total_rows: {total_rows}"
-                    )
-                    for batch in _generate_parquet_batches(parquet_file):
-                        table = _dno_to_combined_geoparquet(dno, batch, context)
-                        table = table.sort_by(
-                            [
-                                ("data_collection_log_timestamp", "ascending"),
-                                ("dno_alias", "ascending"),
-                                ("secondary_substation_unique_id", "ascending"),
-                                ("lv_feeder_unique_id", "ascending"),
-                            ]
-                        )
-                        parquet_writer.write_table(table)
+            for day in range(1, days_in_month + 1):
+                context.log.info(f"Processing day: {day}")
+                start_of_day = datetime(year, month, day, 0, 0, 0, tzinfo=timezone.utc)
+                daily_filters = (
+                    [
+                        (
+                            "data_collection_log_timestamp",
+                            ">=",
+                            pa.scalar(start_of_day),
+                        ),
+                        (
+                            "data_collection_log_timestamp",
+                            "<",
+                            pa.scalar(start_of_day + timedelta(days=1)),
+                        ),
+                    ],
+                )
+                daily_table = None
 
-                        metadata["dagster/row_count"] += table.num_rows
-                        unique_feeder_ids.update(
-                            pc.unique(table.column("lv_feeder_unique_id")).to_pylist()
+                for dno in [DNO.NGED, DNO.SSEN]:
+                    context.log.info(f"Processing DNO: {dno.value}")
+                    with staging_files_resource.open(
+                        dno.value, monthly_file, mode="rb"
+                    ) as in_file:
+                        daily_dno_table = _dno_to_combined_geoparquet(
+                            dno, pq.read_table(in_file, filters=daily_filters)
                         )
-                        unique_substation_ids.update(
-                            pc.unique(
-                                table.column("secondary_substation_unique_id")
-                            ).to_pylist()
-                        )
+                        if daily_table is None:
+                            daily_table = daily_dno_table
+                        else:
+                            daily_table = pa.concat_tables(
+                                [daily_table, daily_dno_table]
+                            )
 
-                        processed_rows += table.num_rows
-                        percentage_processed = int(processed_rows / total_rows * 100)
-                        context.log.info(
-                            f"Processed {processed_rows} rows ({percentage_processed}% of total)"
-                        )
+                daily_table = daily_table.sort_by(
+                    [
+                        ("data_collection_log_timestamp", "ascending"),
+                        ("lv_feeder_unique_id", "ascending"),
+                    ]
+                )
+                parquet_writer.write_table(daily_table)
+
+                metadata["dagster/row_count"] += daily_table.num_rows
+                unique_feeder_ids.update(
+                    pc.unique(daily_table.column("lv_feeder_unique_id")).to_pylist()
+                )
+                unique_substation_ids.update(
+                    pc.unique(
+                        daily_table.column("secondary_substation_unique_id")
+                    ).to_pylist()
+                )
+
             parquet_writer.close()
     except FileNotFoundError:
         context.log.error("Failed to open monthly input file: {e}")
@@ -103,11 +120,21 @@ def lv_feeder_combined_geoparquet(
 
 
 def _create_parquet_writer(out) -> pq.ParquetWriter:
+    # Technically, we only sort the data by timestamp and feeder id, but because of how
+    # the feeder ids are created (concatenating alias + substation + feeder), we can
+    # say that the data is sorted by all three columns and potentially speed up
+    # filtering on any of them.
     sorting_columns = [
-        pq.SortingColumn(4),
-        pq.SortingColumn(1),
-        pq.SortingColumn(6),
-        pq.SortingColumn(7),
+        pq.SortingColumn(
+            lv_feeder_geoparquet_schema.names.index("data_collection_log_timestamp")
+        ),
+        pq.SortingColumn(lv_feeder_geoparquet_schema.names.index("dno_alias")),
+        pq.SortingColumn(
+            lv_feeder_geoparquet_schema.names.index("secondary_substation_unique_id")
+        ),
+        pq.SortingColumn(
+            lv_feeder_geoparquet_schema.names.index("lv_feeder_unique_id")
+        ),
     ]
     return pq.ParquetWriter(
         out,
@@ -133,28 +160,34 @@ def _generate_parquet_batches(
             "total_consumption_active_import",
             "data_collection_log_timestamp",
             "substation_geo_location",
+            "secondary_substation_id",
+            "lv_feeder_id",
         ],
     )
 
 
-def _dno_to_combined_geoparquet(
-    dno: DNO, batch: pa.RecordBatch, context: AssetExecutionContext
-) -> pa.Table:
-    if dno == DNO.NGED:
-        return _nged_to_combined_geoparquet(batch, context)
-    elif dno == DNO.SSEN:
-        return _ssen_to_combined_geoparquet(batch, context)
-    else:
-        raise ValueError(f"Unsupported DNO: {dno} for combined geoparquet")
-
-
-def _ssen_to_combined_geoparquet(
-    batch: pa.RecordBatch, context: AssetExecutionContext
-) -> pa.Table:
-    # Clear any existing metadata
+def _dno_to_combined_geoparquet(dno: DNO, batch: pa.RecordBatch) -> pa.Table:
+    # Clear any existing metadata to avoid clashes
     batch = batch.replace_schema_metadata(None)
+    table = _add_geoparquet_columns(batch)
+    table = _cast_columns(table)
+    table = _add_unique_id_columns(dno, table)
 
-    # Add geoarrow-encoded geometry columns.
+    return table.select(
+        [
+            "dataset_id",
+            "dno_alias",
+            "aggregated_device_count_active",
+            "total_consumption_active_import",
+            "data_collection_log_timestamp",
+            "geometry",
+            "secondary_substation_unique_id",
+            "lv_feeder_unique_id",
+        ]
+    )
+
+
+def _add_geoparquet_columns(batch: pa.RecordBatch) -> pa.Table:
     # I tried adopting the code from geopandas directly, so that we could stick to
     # pyarrow throughout, but it is dense and hard to adapt. I got stuck on the fact
     # that we have some null locations, which I think geopandas works around through
@@ -180,24 +213,10 @@ def _ssen_to_combined_geoparquet(
     )
     del gdf
 
-    # Add unique id columns
-    table = table.append_column(
-        pa.field("secondary_substation_unique_id", pa.string()),
-        pc.binary_join_element_wise(
-            table.column("dno_alias"),
-            pc.utf8_slice_codeunits(table.column("dataset_id"), 0, 10),
-            "-",
-        ),
-    )
-    table = table.append_column(
-        pa.field("lv_feeder_unique_id", pa.string()),
-        pc.binary_join_element_wise(
-            table.column("dno_alias"),
-            table.column("dataset_id"),
-            "-",
-        ),
-    )
+    return table
 
+
+def _cast_columns(table: pa.Table) -> pa.Table:
     # Cast floats to int
     table = table.set_column(
         table.column_names.index("aggregated_device_count_active"),
@@ -219,21 +238,47 @@ def _ssen_to_combined_geoparquet(
         ),
     )
 
-    return table.select(
-        [
-            "dataset_id",
-            "dno_alias",
-            "aggregated_device_count_active",
-            "total_consumption_active_import",
-            "data_collection_log_timestamp",
-            "geometry",
-            "secondary_substation_unique_id",
-            "lv_feeder_unique_id",
-        ]
-    )
+    return table
 
 
-def _nged_to_combined_geoparquet(
-    batch: pa.RecordBatch, context: AssetExecutionContext
-) -> pa.Table:
-    pass
+def _add_unique_id_columns(dno: DNO, table: pa.Table) -> pa.Table:
+    if dno == DNO.NGED:
+        # Add unique id columns by combining separate columns
+        table = table.append_column(
+            pa.field("secondary_substation_unique_id", pa.string()),
+            pc.binary_join_element_wise(
+                table.column("dno_alias"),
+                table.column("secondary_substation_id"),
+                "-",
+            ),
+        )
+        table = table.append_column(
+            pa.field("lv_feeder_unique_id", pa.string()),
+            pc.binary_join_element_wise(
+                table.column("secondary_substation_unique_id"),
+                table.column("lv_feeder_id"),
+                "-",
+            ),
+        )
+    elif dno == DNO.SSEN:
+        # Add unique id columns using SSEN's dataset_id
+        table = table.append_column(
+            pa.field("secondary_substation_unique_id", pa.string()),
+            pc.binary_join_element_wise(
+                table.column("dno_alias"),
+                pc.utf8_slice_codeunits(table.column("dataset_id"), 0, 10),
+                "-",
+            ),
+        )
+        table = table.append_column(
+            pa.field("lv_feeder_unique_id", pa.string()),
+            pc.binary_join_element_wise(
+                table.column("dno_alias"),
+                table.column("dataset_id"),
+                "-",
+            ),
+        )
+    else:
+        raise ValueError(f"Unsupported DNO: {dno} for combined geoparquet")
+
+    return table
