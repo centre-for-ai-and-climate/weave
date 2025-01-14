@@ -107,7 +107,7 @@ class SSENAPIClient(ConfigurableResource, ABC):
                     with z_nested.open("SEPD_transformers_open_data_with_nrn.csv") as f:
                         return pd.read_csv(f, usecols=cols, dtype=dtypes)
 
-    def lv_feeder_file_pyarrow_table(self, input_file: OpenFile):
+    def lv_feeder_file_pyarrow_table(self, input_file: OpenFile) -> pa.Table:
         """Read an LV Feeder CSV file into a PyArrow Table."""
         pyarrow_csv_convert_options = pa_csv.ConvertOptions(
             column_types=self.lv_feeder_csv_schema,
