@@ -36,3 +36,16 @@ def lv_feeder_monthly_parquet_needs_updating(
         & ~AutomationCondition.any_deps_in_progress()
         & ~AutomationCondition.in_progress()
     ).with_label("lv_feeder_monthly_parquet_needs_updating")
+
+
+def lv_feeder_combined_geoparquet_needs_updating() -> AutomationCondition:
+    """
+    A version of needs_updating() which doesn't care about missing dependencies, so we
+    can trigger the update of the combined geoparquet file even if some of the
+    individual DNO files are missing.
+    """
+    return (
+        AutomationCondition.any_deps_updated().since_last_handled()
+        & ~AutomationCondition.any_deps_in_progress()
+        & ~AutomationCondition.in_progress()
+    ).with_label("lv_feeder_combined_geoparquet_needs_updating")

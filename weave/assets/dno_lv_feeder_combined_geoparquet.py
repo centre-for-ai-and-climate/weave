@@ -1,6 +1,5 @@
 import calendar
 from datetime import datetime, timedelta, timezone
-from typing import Generator
 
 import geopandas as gpd
 import pyarrow as pa
@@ -14,7 +13,7 @@ from dagster import (
 )
 from geopandas.io.arrow import _geopandas_to_arrow
 
-from ..automation_conditions import needs_updating
+from ..automation_conditions import lv_feeder_combined_geoparquet_needs_updating
 from ..core import DNO, lv_feeder_geoparquet_schema
 from ..resources.output_files import OutputFilesResource
 
@@ -26,7 +25,7 @@ from ..resources.output_files import OutputFilesResource
     feeder data we have.""",
     partitions_def=MonthlyPartitionsDefinition(start_date="2024-01-01", end_offset=1),
     deps=["ssen_lv_feeder_monthly_parquet", "nged_lv_feeder_monthly_parquet"],
-    automation_condition=needs_updating(),
+    automation_condition=lv_feeder_combined_geoparquet_needs_updating(),
 )
 def lv_feeder_combined_geoparquet(
     context: AssetExecutionContext,
@@ -161,24 +160,6 @@ def _create_parquet_writer(out) -> pq.ParquetWriter:
         allow_truncated_timestamps=True,
         sorting_columns=sorting_columns,
         store_decimal_as_integer=True,
-    )
-
-
-def _generate_parquet_batches(
-    parquet_file: pq.ParquetFile,
-) -> Generator[pa.RecordBatch, None, None]:
-    return parquet_file.iter_batches(
-        batch_size=1024 * 1024,
-        columns=[
-            "dataset_id",
-            "dno_alias",
-            "aggregated_device_count_active",
-            "total_consumption_active_import",
-            "data_collection_log_timestamp",
-            "substation_geo_location",
-            "secondary_substation_id",
-            "lv_feeder_id",
-        ],
     )
 
 

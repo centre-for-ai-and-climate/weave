@@ -70,9 +70,9 @@ def test_ssen_postcode_lookup_automation(instance):
     materialize(instance, "onspd")
     result = evaluate_automation_conditions(defs, instance, cursor=result.cursor)
     # Then, nothing should be requested
-    assert (
-        result.total_requested == 0
-    ), "Postcode lookup shouldn't be requested when dependencies are missing"
+    assert result.total_requested == 0, (
+        "Postcode lookup shouldn't be requested when dependencies are missing"
+    )
 
     # When we have ONSPD and the postcode mapping file
     materialize(instance, "ssen_lv_feeder_postcode_mapping")
@@ -96,17 +96,17 @@ def test_ssen_monthly_files_automation(instance):
     )
     result = evaluate_automation_conditions(defs, instance, cursor=result.cursor)
     # Then, nothing should be requested
-    assert (
-        result.total_requested == 0
-    ), "Monthly files shouldn't be requested by automation after raw files update, that's controlled by a sensor"
+    assert result.total_requested == 0, (
+        "Monthly files shouldn't be requested by automation after raw files update, that's controlled by a sensor"
+    )
 
     # When we materialise just the transformer location lookup
     materialize(instance, "ssen_substation_location_lookup_transformer_load_model")
     result = evaluate_automation_conditions(defs, instance, cursor=result.cursor)
     # Then, nothing should be requested - because we're missing the postcode lookup
-    assert (
-        result.total_requested == 0
-    ), "Monthly files shouldn't be requested if dependencies are missing"
+    assert result.total_requested == 0, (
+        "Monthly files shouldn't be requested if dependencies are missing"
+    )
 
     # When we materialise the postcode location lookup
     materialize(instance, "ssen_substation_location_lookup_feeder_postcodes")
@@ -120,8 +120,7 @@ def test_ssen_monthly_files_automation(instance):
         today.month - start_date.month
     )
     expected_partitions = months_difference + 1
-    # Combined geoparguet gets requested too, hence doubling the expected partitions
-    assert result.total_requested == expected_partitions * 2
+    assert result.total_requested == expected_partitions
     assert (
         len(result.get_requested_partitions(AssetKey("ssen_lv_feeder_monthly_parquet")))
         == expected_partitions
@@ -142,3 +141,13 @@ def test_combined_geoparquet_automation(instance):
     assert result.get_requested_partitions(
         AssetKey("lv_feeder_combined_geoparquet")
     ) == {"2024-02-01"}
+
+    # When we materialise another one of the monthly files and run the automation tick
+    materialize(instance, "nged_lv_feeder_monthly_parquet", "2024-01-01")
+    result = evaluate_automation_conditions(defs, instance, cursor=result.cursor)
+
+    # Then, we should materialise the same partition in the combined geoparquet
+    assert_materialization_requested(result, "lv_feeder_combined_geoparquet")
+    assert result.get_requested_partitions(
+        AssetKey("lv_feeder_combined_geoparquet")
+    ) == {"2024-01-01"}
