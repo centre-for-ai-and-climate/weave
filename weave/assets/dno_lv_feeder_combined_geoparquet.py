@@ -47,67 +47,83 @@ def lv_feeder_combined_geoparquet(
     unique_feeder_ids = set()
     unique_substation_ids = set()
 
-    try:
-        with output_files_resource.open("smart-meter", monthly_file, mode="wb") as out:
-            parquet_writer = _create_parquet_writer(out)
-            metadata["dagster/uri"] = output_files_resource.path(
-                "smart-meter", monthly_file
+    with output_files_resource.open("smart-meter", monthly_file, mode="wb") as out:
+        parquet_writer = _create_parquet_writer(out)
+        metadata["dagster/uri"] = output_files_resource.path(
+            "smart-meter", monthly_file
+        )
+        for day in range(1, days_in_month + 1):
+            context.log.info(f"Processing day: {day}")
+            start_of_day = datetime(year, month, day, 0, 0, 0, tzinfo=timezone.utc)
+            daily_filters = (
+                [
+                    (
+                        "data_collection_log_timestamp",
+                        ">=",
+                        pa.scalar(start_of_day),
+                    ),
+                    (
+                        "data_collection_log_timestamp",
+                        "<",
+                        pa.scalar(start_of_day + timedelta(days=1)),
+                    ),
+                ],
             )
-            for day in range(1, days_in_month + 1):
-                context.log.info(f"Processing day: {day}")
-                start_of_day = datetime(year, month, day, 0, 0, 0, tzinfo=timezone.utc)
-                daily_filters = (
-                    [
-                        (
-                            "data_collection_log_timestamp",
-                            ">=",
-                            pa.scalar(start_of_day),
-                        ),
-                        (
-                            "data_collection_log_timestamp",
-                            "<",
-                            pa.scalar(start_of_day + timedelta(days=1)),
-                        ),
-                    ],
-                )
-                daily_table = None
+            daily_table = None
 
-                for dno in [DNO.NGED, DNO.SSEN]:
-                    context.log.info(f"Processing DNO: {dno.value}")
+            for dno in [DNO.NGED, DNO.SSEN]:
+                context.log.info(f"Processing DNO: {dno.value}")
+                daily_dno_table = None
+                try:
                     with staging_files_resource.open(
                         dno.value, monthly_file, mode="rb"
                     ) as in_file:
-                        daily_dno_table = _dno_to_combined_geoparquet(
-                            dno, pq.read_table(in_file, filters=daily_filters)
-                        )
-                        if daily_table is None:
-                            daily_table = daily_dno_table
-                        else:
-                            daily_table = pa.concat_tables(
-                                [daily_table, daily_dno_table]
+                        daily_dno_table = pq.read_table(in_file, filters=daily_filters)
+                        if daily_dno_table.num_rows == 0:
+                            context.log.info(
+                                f"No data for {day} in {dno.value}, skipping"
                             )
+                            continue
+                        daily_dno_table = _dno_to_combined_geoparquet(
+                            dno, daily_dno_table
+                        )
+                except FileNotFoundError:
+                    context.log.info(
+                        f"Ignoring missing file {monthly_file} for DNO: {dno.value}"
+                    )
+                    continue
 
-                daily_table = daily_table.sort_by(
-                    [
-                        ("data_collection_log_timestamp", "ascending"),
-                        ("lv_feeder_unique_id", "ascending"),
-                    ]
-                )
-                parquet_writer.write_table(daily_table)
+                if daily_table is None:
+                    daily_table = daily_dno_table
+                else:
+                    daily_table = pa.concat_tables([daily_table, daily_dno_table])
 
-                metadata["dagster/row_count"] += daily_table.num_rows
-                unique_feeder_ids.update(
-                    pc.unique(daily_table.column("lv_feeder_unique_id")).to_pylist()
-                )
-                unique_substation_ids.update(
-                    pc.unique(
-                        daily_table.column("secondary_substation_unique_id")
-                    ).to_pylist()
-                )
+            if daily_table is None or daily_table.num_rows == 0:
+                context.log.info(f"No data for {day}, skipping")
+                continue
 
-            parquet_writer.close()
-    except FileNotFoundError:
-        context.log.error("Failed to open monthly input file: {e}")
+            daily_table = daily_table.sort_by(
+                [
+                    ("data_collection_log_timestamp", "ascending"),
+                    ("lv_feeder_unique_id", "ascending"),
+                ]
+            )
+            parquet_writer.write_table(daily_table)
+
+            metadata["dagster/row_count"] += daily_table.num_rows
+            unique_feeder_ids.update(
+                pc.unique(daily_table.column("lv_feeder_unique_id")).to_pylist()
+            )
+            unique_substation_ids.update(
+                pc.unique(
+                    daily_table.column("secondary_substation_unique_id")
+                ).to_pylist()
+            )
+
+        parquet_writer.close()
+
+    if metadata["dagster/row_count"] == 0:
+        context.log.info(f"No data found for {year}-{month:02d}, deleting output file")
         context.log.info(
             f"Attempting to delete {output_files_resource.path("smart-meter", monthly_file)}"
         )

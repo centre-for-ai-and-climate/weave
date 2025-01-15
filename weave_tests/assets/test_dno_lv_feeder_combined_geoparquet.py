@@ -233,7 +233,7 @@ def test_lv_feeder_combined_geoparquet(tmp_path):
     assert gdf.iloc[174].lv_feeder_unique_id == "SSEN-000200200101"
 
 
-def test_lv_feeder_combined_geoparquet_handles_missing_input(tmp_path):
+def test_lv_feeder_combined_geoparquet_handles_completely_missing_input(tmp_path):
     input_dir = tmp_path / "staging" / "ssen"
     input_dir.mkdir(parents=True)
     output_dir = tmp_path / "output"
@@ -251,3 +251,32 @@ def test_lv_feeder_combined_geoparquet_handles_missing_input(tmp_path):
     )
 
     assert not (output_dir / "smart-meter" / "2024-02.parquet").exists()
+
+
+def test_lv_feeder_combined_geoparquet_handles_partially_missing_input(tmp_path):
+    ssen_input_dir = tmp_path / "staging" / "ssen"
+    ssen_input_dir.mkdir(parents=True)
+    nged_input_dir = tmp_path / "staging" / "nged"
+    nged_input_dir.mkdir(parents=True)
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+
+    # Make some data, but not all of it:
+    # - No SSEN data, to test a missing DNO
+    # - Missing even-numbered days in NGED data, to test missing days
+    monthly_file = nged_input_dir / "2024-01.parquet"
+    data = nged_lv_feeder_monthly_parquet_factory(1)
+    df = pd.DataFrame.from_records(data=data)
+    df = df[df["data_collection_log_timestamp"].dt.day % 2 == 1]
+    df.to_parquet(monthly_file)
+
+    context = build_asset_context(partition_key="2024-01-01")
+    staging_files_resource = OutputFilesResource(url=(tmp_path / "staging").as_uri())
+    output_files_resource = OutputFilesResource(url=(tmp_path / "output").as_uri())
+
+    lv_feeder_combined_geoparquet(
+        context, staging_files_resource, output_files_resource
+    )
+
+    gdf = gpd.read_parquet(output_dir / "smart-meter" / "2024-01.parquet")
+    assert len(gdf) == 6 * 16  # 6 feeders * 16 odd-numbered days in January
