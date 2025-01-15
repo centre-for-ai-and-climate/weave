@@ -1,7 +1,6 @@
 import calendar
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
-import polars as pl
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
@@ -229,6 +228,7 @@ def nged_lv_feeder_monthly_parquet(
     partition_date = datetime.strptime(context.partition_key, "%Y-%m-%d")
     year = partition_date.year
     month = partition_date.month
+    days_in_month = calendar.monthrange(year, month)[1]
 
     monthly_unsorted_file = f"{year}-{month:02d}-unsorted.parquet"
     monthly_file = f"{year}-{month:02d}.parquet"
@@ -316,16 +316,43 @@ def nged_lv_feeder_monthly_parquet(
         parquet_writer.close()
         metadata["weave/nunique_feeders"] = len(unique_feeders)
 
-    out_file = staging_files_resource.path(DNO.NGED.value, monthly_file)
-    in_file = staging_files_resource.path(DNO.NGED.value, monthly_unsorted_file)
-    query = pl.scan_parquet(in_file).sort(
-        "data_collection_log_timestamp",
-        "secondary_substation_id",
-        "lv_feeder_id",
-    )
-    query.sink_parquet(out_file)
+    # Reopen parquet for second pass of writing, sorted
+    with staging_files_resource.open(DNO.NGED.value, monthly_file, mode="wb") as out:
+        parquet_writer = _create_parquet_writer(out)
+        for day in range(1, days_in_month + 1):
+            context.log.info(f"Processing day: {day}")
+            start_of_day = datetime(year, month, day, 0, 0, 0, tzinfo=timezone.utc)
+            daily_filters = (
+                [
+                    (
+                        "data_collection_log_timestamp",
+                        ">=",
+                        pa.scalar(start_of_day),
+                    ),
+                    (
+                        "data_collection_log_timestamp",
+                        "<",
+                        pa.scalar(start_of_day + timedelta(days=1)),
+                    ),
+                ],
+            )
 
-    staging_files_resource.delete(DNO.NGED.value, monthly_unsorted_file)
+            with staging_files_resource.open(
+                DNO.NGED.value, monthly_unsorted_file, mode="rb"
+            ) as in_file:
+                table = pq.read_table(in_file, filters=daily_filters)
+                if table.num_rows == 0:
+                    context.log.info(f"No data for {day}, skipping")
+                    continue
+                table = table.sort_by(
+                    [
+                        ("data_collection_log_timestamp", "ascending"),
+                        ("secondary_substation_id", "ascending"),
+                        ("lv_feeder_id", "ascending"),
+                    ]
+                )
+                parquet_writer.write_table(table)
+        parquet_writer.close()
 
     return MaterializeResult(metadata=metadata)
 
