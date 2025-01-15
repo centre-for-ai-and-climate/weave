@@ -1,6 +1,7 @@
 import calendar
 from datetime import datetime
 
+import polars as pl
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
@@ -128,8 +129,8 @@ def _ssen_files_for_month(year: int, month: int) -> list[str]:
     return files
 
 
-def _create_parquet_writer(out: OpenFile) -> pq.ParquetWriter:
-    sorting_columns = [
+def _create_parquet_writer(out: OpenFile, sorted=True) -> pq.ParquetWriter:
+    default_sorting_columns = [
         pq.SortingColumn(
             lv_feeder_parquet_schema.names.index("data_collection_log_timestamp")
         ),
@@ -139,6 +140,11 @@ def _create_parquet_writer(out: OpenFile) -> pq.ParquetWriter:
         ),
         pq.SortingColumn(lv_feeder_parquet_schema.names.index("lv_feeder_id")),
     ]
+    if sorted:
+        sorting_columns = default_sorting_columns
+    else:
+        sorting_columns = None
+
     return pq.ParquetWriter(
         out, lv_feeder_parquet_schema, sorting_columns=sorting_columns
     )
@@ -219,11 +225,16 @@ def nged_lv_feeder_monthly_parquet(
     nged_api_client: NGEDAPIClient,
 ) -> MaterializeResult:
     metadata = {"dagster/row_count": 0, "weave/nunique_feeders": 0}
+
     partition_date = datetime.strptime(context.partition_key, "%Y-%m-%d")
     year = partition_date.year
     month = partition_date.month
+
+    monthly_unsorted_file = f"{year}-{month:02d}-unsorted.parquet"
     monthly_file = f"{year}-{month:02d}.parquet"
     part_files = _nged_files_for_month(context, nged_api_client, context.partition_key)
+
+    metadata["dagster/uri"] = staging_files_resource.path(DNO.NGED.value, monthly_file)
 
     if len(part_files) == 0:
         context.log.info(f"No data found for {monthly_file}, not creating parquet file")
@@ -231,87 +242,90 @@ def nged_lv_feeder_monthly_parquet(
     else:
         context.log.info(f"Producing {monthly_file} from {len(part_files)} part files")
 
-    with staging_files_resource.open(DNO.NGED.value, monthly_file, mode="wb") as out:
-        parquet_writer = _create_parquet_writer(out)
-        metadata["dagster/uri"] = staging_files_resource.path(
-            DNO.NGED.value, monthly_file
-        )
-        table = None
+    # Open for first pass of writing, unordered
+    with staging_files_resource.open(
+        DNO.NGED.value, monthly_unsorted_file, mode="wb"
+    ) as out:
+        parquet_writer = _create_parquet_writer(out, sorted=False)
+
+        unique_feeders = set()
 
         for csv in part_files:
-            part_table = _read_csv_into_pyarrow_table(
+            table = _read_csv_into_pyarrow_table(
                 context, DNO.NGED, raw_files_resource, nged_api_client, csv
             )
 
-            if table is None:
-                table = part_table
-            else:
-                table = pa.concat_tables([table, part_table])
+            table = table.rename_columns(
+                {
+                    "dataset_id": "dataset_id",
+                    "dno_alias": "dno_alias",
+                    "secondary_substation_id": "secondary_substation_id",
+                    "secondary_substation_name": "secondary_substation_name",
+                    "LV_feeder_ID": "lv_feeder_id",
+                    "LV_feeder_name": "lv_feeder_name",
+                    "substation_geo_location": "substation_geo_location",
+                    "aggregated_device_count_Active": "aggregated_device_count_active",
+                    "Total_consumption_active_import": "total_consumption_active_import",
+                    "data_collection_log_timestamp": "data_collection_log_timestamp",
+                    "Insert_time": "insert_time",
+                    "last_modified_time": "last_modified_time",
+                }
+            )
 
-        table = table.rename_columns(
-            {
-                "dataset_id": "dataset_id",
-                "dno_alias": "dno_alias",
-                "secondary_substation_id": "secondary_substation_id",
-                "secondary_substation_name": "secondary_substation_name",
-                "LV_feeder_ID": "lv_feeder_id",
-                "LV_feeder_name": "lv_feeder_name",
-                "substation_geo_location": "substation_geo_location",
-                "aggregated_device_count_Active": "aggregated_device_count_active",
-                "Total_consumption_active_import": "total_consumption_active_import",
-                "data_collection_log_timestamp": "data_collection_log_timestamp",
-                "Insert_time": "insert_time",
-                "last_modified_time": "last_modified_time",
-            }
-        )
+            # Replace empty string with nulls
+            for field in [
+                "dataset_id",
+                "dno_alias",
+                "secondary_substation_name",
+                "lv_feeder_name",
+                "substation_geo_location",
+            ]:
+                table = table.set_column(
+                    table.column_names.index(field),
+                    pa.field(field, pa.string()),
+                    pc.replace_with_mask(
+                        table.column(field),
+                        pc.is_in(
+                            table.column(field), pa.array(["", ", "])
+                        ).combine_chunks(),
+                        pa.scalar(None, pa.string()),
+                    ),
+                )
 
-        # Replace empty string with nulls
-        for field in [
-            "dataset_id",
-            "dno_alias",
-            "secondary_substation_name",
-            "lv_feeder_name",
-            "substation_geo_location",
-        ]:
+            # Fill blank DNO alias rows, we can't fill much else as we don't have the data,
+            # but we can at least do this - see experiments/nged-exploration.ipynb
             table = table.set_column(
-                table.column_names.index(field),
-                pa.field(field, pa.string()),
-                pc.replace_with_mask(
-                    table.column(field),
-                    pc.is_in(
-                        table.column(field), pa.array(["", ", "])
-                    ).combine_chunks(),
-                    pa.scalar(None, pa.string()),
-                ),
+                table.column_names.index("dno_alias"),
+                pa.field("dno_alias", pa.string()),
+                pc.fill_null(table.column("dno_alias"), "NGED"),
             )
 
-        # Fill blank DNO alias rows, we can't fill much else as we don't have the data,
-        # but we can at least do this - see experiments/nged-exploration.ipynb
-        table = table.set_column(
-            table.column_names.index("dno_alias"),
-            pa.field("dno_alias", pa.string()),
-            pc.fill_null(table.column("dno_alias"), "NGED"),
-        )
+            parquet_writer.write_table(table)
 
-        table = table.sort_by(
-            [
-                ("data_collection_log_timestamp", "ascending"),
-                ("secondary_substation_id", "ascending"),
-                ("lv_feeder_id", "ascending"),
-            ]
-        )
+            unique_feeders.update(
+                pc.unique(
+                    pc.binary_join_element_wise(
+                        table.column("secondary_substation_id"),
+                        table.column("lv_feeder_id"),
+                        "-",
+                    )
+                ).to_pylist()
+            )
+            metadata["dagster/row_count"] += table.num_rows
 
-        parquet_writer.write_table(table)
         parquet_writer.close()
+        metadata["weave/nunique_feeders"] = len(unique_feeders)
 
-        metadata["weave/nunique_feeders"] = pc.count_distinct(
-            pc.binary_join_element_wise(
-                table.column("secondary_substation_id"),
-                table.column("lv_feeder_id"),
-                "-",
-            )
-        ).as_py()
-        metadata["dagster/row_count"] = table.num_rows
+    out_file = staging_files_resource.path(DNO.NGED.value, monthly_file)
+    in_file = staging_files_resource.path(DNO.NGED.value, monthly_unsorted_file)
+    query = pl.scan_parquet(in_file).sort(
+        "data_collection_log_timestamp",
+        "secondary_substation_id",
+        "lv_feeder_id",
+    )
+    query.sink_parquet(out_file)
+
+    staging_files_resource.delete(DNO.NGED.value, monthly_unsorted_file)
 
     return MaterializeResult(metadata=metadata)
 
