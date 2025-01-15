@@ -63,58 +63,58 @@ def ssen_lv_feeder_monthly_parquet(
             DNO.SSEN.value, monthly_file
         )
         metadata["dagster/row_count"] = 0
-        table = None
+        unique_feeders = set()
 
         for csv in daily_files:
+            table = None
             try:
-                daily_table = _read_csv_into_pyarrow_table(
+                table = _read_csv_into_pyarrow_table(
                     context, DNO.SSEN, raw_files_resource, ssen_api_client, csv
                 )
-                if table is None:
-                    table = daily_table
-                else:
-                    table = pa.concat_tables([table, daily_table])
             except FileNotFoundError:
                 context.log.info(
                     f"Ignoring missing SSEN daily file {csv} when building monthly file {monthly_file}"
                 )
+                continue
 
-        if table is None:
-            context.log.info(f"No data found for {monthly_file}, deleting empty file")
-            staging_files_resource.delete(DNO.SSEN.value, monthly_file)
-            return MaterializeResult(metadata=metadata)
+            table = table.append_column(
+                "substation_nrn",
+                [pc.utf8_slice_codeunits(table.column("dataset_id"), 0, 10)],
+            )
+            table = table.join(
+                location_lookup,
+                keys="substation_nrn",
+                join_type="left outer",
+                right_suffix="_lookup",
+            )
+            # Join adds a new column, we want to overwrite the old one
+            table = table.set_column(
+                table.column_names.index("substation_geo_location"),
+                pa.field("substation_geo_location", pa.string()),
+                table.column("substation_geo_location_lookup"),
+            )
+            table = table.drop_columns(
+                ["substation_nrn", "substation_geo_location_lookup"]
+            )
+            table = table.sort_by(
+                [
+                    ("data_collection_log_timestamp", "ascending"),
+                    ("dataset_id", "ascending"),
+                ]
+            )
 
-        table = table.append_column(
-            "substation_nrn",
-            [pc.utf8_slice_codeunits(table.column("dataset_id"), 0, 10)],
-        )
-        table = table.join(
-            location_lookup,
-            keys="substation_nrn",
-            join_type="left outer",
-            right_suffix="_lookup",
-        )
-        # Join adds a new column, we want to overwrite the old one
-        table = table.set_column(
-            table.column_names.index("substation_geo_location"),
-            pa.field("substation_geo_location", pa.string()),
-            table.column("substation_geo_location_lookup"),
-        )
-        table = table.drop_columns(["substation_nrn", "substation_geo_location_lookup"])
-        table = table.sort_by(
-            [
-                ("data_collection_log_timestamp", "ascending"),
-                ("dataset_id", "ascending"),
-            ]
-        )
+            parquet_writer.write_table(table)
 
-        parquet_writer.write_table(table)
+            metadata["dagster/row_count"] += table.num_rows
+            unique_feeders.update(pc.unique(table.column("dataset_id")).to_pylist())
         parquet_writer.close()
 
-        metadata["dagster/row_count"] += table.num_rows
-        metadata["weave/nunique_feeders"] = pc.count_distinct(
-            table.column("dataset_id")
-        ).as_py()
+    if metadata["dagster/row_count"] == 0:
+        context.log.info(f"No data found for {monthly_file}, deleting empty file")
+        staging_files_resource.delete(DNO.SSEN.value, monthly_file)
+        return MaterializeResult(metadata=metadata)
+
+    metadata["weave/nunique_feeders"] = len(unique_feeders)
 
     return MaterializeResult(metadata=metadata)
 
