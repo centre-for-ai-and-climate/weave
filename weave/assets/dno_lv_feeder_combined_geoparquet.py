@@ -25,7 +25,7 @@ from ..resources.output_files import OutputFilesResource
     An ever-growing monthly-partitioned geoparquet file containing all the low-voltage
     feeder data we have.""",
     partitions_def=MonthlyPartitionsDefinition(start_date="2024-02-01", end_offset=1),
-    deps=["ssen_lv_feeder_monthly_parquet"],
+    deps=["ssen_lv_feeder_monthly_parquet", "nged_lv_feeder_monthly_parquet"],
     automation_condition=needs_updating(),
 )
 def lv_feeder_combined_geoparquet(
