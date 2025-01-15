@@ -265,6 +265,26 @@ def nged_lv_feeder_monthly_parquet(
             }
         )
 
+        # Replace empty string with nulls
+        for field in [
+            "dataset_id",
+            "dno_alias",
+            "secondary_substation_name",
+            "lv_feeder_name",
+            "substation_geo_location",
+        ]:
+            table = table.set_column(
+                table.column_names.index(field),
+                pa.field(field, pa.string()),
+                pc.replace_with_mask(
+                    table.column(field),
+                    pc.is_in(
+                        table.column(field), pa.array(["", ", "])
+                    ).combine_chunks(),
+                    pa.scalar(None, pa.string()),
+                ),
+            )
+
         # Fill blank DNO alias rows, we can't fill much else as we don't have the data,
         # but we can at least do this - see experiments/nged-exploration.ipynb
         table = table.set_column(
