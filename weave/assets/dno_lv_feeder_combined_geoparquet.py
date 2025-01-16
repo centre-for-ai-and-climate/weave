@@ -162,7 +162,7 @@ def _create_parquet_writer(out) -> pq.ParquetWriter:
         out,
         schema=lv_feeder_geoparquet_schema,
         compression="zstd",
-        compression_level=22,
+        compression_level=9,
         coerce_timestamps="ms",
         allow_truncated_timestamps=True,
         sorting_columns=sorting_columns,
