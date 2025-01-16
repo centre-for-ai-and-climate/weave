@@ -16,7 +16,7 @@ from dagster import (
 )
 from fsspec.core import OpenFile
 
-from ..automation_conditions import lv_feeder_monthly_parquet_needs_updating
+from ..automation_conditions import ssen_lv_feeder_monthly_parquet_needs_updating
 from ..core import DNO, lv_feeder_parquet_schema
 from ..dagster_helpers import get_materialisations
 from ..resources.nged import NGEDAPIClient
@@ -39,7 +39,7 @@ from .dno_lv_feeder_files import nged_lv_feeder_files
         "ssen_substation_location_lookup_transformer_load_model",
     ],
     # See also sensors.ssen_lv_feeder_monthly_parquet_sensor
-    automation_condition=lv_feeder_monthly_parquet_needs_updating(
+    automation_condition=ssen_lv_feeder_monthly_parquet_needs_updating(
         AssetSelection.assets("ssen_lv_feeder_files")
     ),
 )

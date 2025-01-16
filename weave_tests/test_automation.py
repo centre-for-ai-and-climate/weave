@@ -113,18 +113,14 @@ def test_ssen_monthly_files_automation(instance):
     result = evaluate_automation_conditions(
         instance=instance, defs=defs, cursor=result.cursor
     )
-    # Then, we should request updates of all the monthly files
-    start_date = datetime(2024, 2, 1)
+    # Then, we should request updates of the latest two monthly files
     today = datetime.today()
-    months_difference = (today.year - start_date.year) * 12 + (
-        today.month - start_date.month
+    latest_partition = f"{today.year}-{today.month:02d}-01"
+    requested_partitions = result.get_requested_partitions(
+        AssetKey("ssen_lv_feeder_monthly_parquet")
     )
-    expected_partitions = months_difference + 1
-    assert result.total_requested == expected_partitions
-    assert (
-        len(result.get_requested_partitions(AssetKey("ssen_lv_feeder_monthly_parquet")))
-        == expected_partitions
-    )
+    assert result.total_requested == 1
+    assert requested_partitions == set([latest_partition])
 
 
 def test_combined_geoparquet_automation(instance):

@@ -19,7 +19,7 @@ def needs_updating() -> AutomationCondition:
     ).with_label("needs_updating")
 
 
-def lv_feeder_monthly_parquet_needs_updating(
+def ssen_lv_feeder_monthly_parquet_needs_updating(
     raw_files_asset_selection: AssetSelection,
 ) -> AutomationCondition:
     """
@@ -29,13 +29,14 @@ def lv_feeder_monthly_parquet_needs_updating(
     of waiting for in progress updates in those raw file assets .
     """
     return (
-        AutomationCondition.any_deps_updated()
+        AutomationCondition.in_latest_time_window()
+        & AutomationCondition.any_deps_updated()
         .ignore(raw_files_asset_selection)
         .since_last_handled()
         & ~AutomationCondition.any_deps_missing().ignore(raw_files_asset_selection)
         & ~AutomationCondition.any_deps_in_progress()
         & ~AutomationCondition.in_progress()
-    ).with_label("lv_feeder_monthly_parquet_needs_updating")
+    ).with_label("ssen_lv_feeder_monthly_parquet_needs_updating")
 
 
 def lv_feeder_combined_geoparquet_needs_updating() -> AutomationCondition:
