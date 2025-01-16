@@ -1,4 +1,6 @@
 import calendar
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 
 import geopandas as gpd
@@ -46,7 +48,24 @@ def lv_feeder_combined_geoparquet(
     unique_feeder_ids = set()
     unique_substation_ids = set()
 
-    with output_files_resource.open("smart-meter", monthly_file, mode="wb") as out:
+    # Cache monthly files locally to improve performance
+    included_dnos = [DNO.NGED, DNO.SSEN]
+    input_files = []
+    for dno in included_dnos:
+        try:
+            _, path = tempfile.mkstemp()
+            staging_files_resource.get_file(dno.value, monthly_file, path)
+            input_files.append((dno, path))
+        except FileNotFoundError as e:
+            context.log.info(
+                f"Missing file {monthly_file} for DNO: {dno.value}, skipping. Error: {e}"
+            )
+    if input_files == []:
+        context.log.info(f"No data found for {year}-{month:02d}, skipping")
+        return MaterializeResult(metadata=metadata)
+
+    _, tmp_out_path = tempfile.mkstemp()
+    with open(tmp_out_path, mode="wb") as out:
         parquet_writer = _create_parquet_writer(out)
         metadata["dagster/uri"] = output_files_resource.path(
             "smart-meter", monthly_file
@@ -70,31 +89,21 @@ def lv_feeder_combined_geoparquet(
             )
             daily_table = None
 
-            for dno in [DNO.NGED, DNO.SSEN]:
-                context.log.info(f"Processing DNO: {dno.value}")
+            for dno, file in input_files:
+                context.log.info(f"Processing input file: {file} for dno: {dno.value}")
                 daily_dno_table = None
-                try:
-                    with staging_files_resource.open(
-                        dno.value, monthly_file, mode="rb"
-                    ) as in_file:
-                        daily_dno_table = pq.read_table(in_file, filters=daily_filters)
-                        if daily_dno_table.num_rows == 0:
-                            context.log.info(
-                                f"No data for {day} in {dno.value}, skipping"
-                            )
-                            continue
-                        else:
-                            context.log.info(
-                                f"Found {daily_dno_table.num_rows} rows for {day} in {monthly_file}"
-                            )
-                        daily_dno_table = _dno_to_combined_geoparquet(
-                            context, dno, daily_dno_table
+                with open(file, mode="rb") as in_file:
+                    daily_dno_table = pq.read_table(in_file, filters=daily_filters)
+                    if daily_dno_table.num_rows == 0:
+                        context.log.info(f"No data for {day} in {dno.value}, skipping")
+                        continue
+                    else:
+                        context.log.info(
+                            f"Found {daily_dno_table.num_rows} rows for {day} in {monthly_file}"
                         )
-                except FileNotFoundError:
-                    context.log.info(
-                        f"Ignoring missing file {monthly_file} for DNO: {dno.value}"
+                    daily_dno_table = _dno_to_combined_geoparquet(
+                        context, dno, daily_dno_table
                     )
-                    continue
 
                 if daily_table is None:
                     daily_table = daily_dno_table
@@ -125,15 +134,26 @@ def lv_feeder_combined_geoparquet(
                     daily_table.column("secondary_substation_unique_id")
                 ).to_pylist()
             )
-
+        context.log.info("Closing parquet file")
         parquet_writer.close()
 
     if metadata["dagster/row_count"] == 0:
-        context.log.info(f"No data found for {year}-{month:02d}, deleting output file")
-        context.log.info(
-            f"Attempting to delete {output_files_resource.path('smart-meter', monthly_file)}"
-        )
-        output_files_resource.delete("smart-meter", monthly_file)
+        context.log.info(f"No data found for {year}-{month:02d}, skipping")
+        return MaterializeResult(metadata=metadata)
+
+    # Copy temporary file to final location
+    context.log.info("Copying temporary file to final location")
+    output_files_resource.put_file(
+        tmp_out_path,
+        "smart-meter",
+        monthly_file,
+    )
+
+    # Clean up temp files
+    context.log.info("Cleaning up temporary files")
+    for _, path in input_files:
+        os.remove(path)
+    os.remove(tmp_out_path)
 
     metadata["weave/nunique_feeders"] = len(unique_feeder_ids)
     metadata["weave/nunique_substations"] = len(unique_substation_ids)

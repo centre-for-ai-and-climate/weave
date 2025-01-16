@@ -38,13 +38,13 @@ FIXTURE_DIR = os.path.join(CURRENT_DIR, "..", "weave_tests", "fixtures")
 resources = {
     "dev_local": {
         "raw_files_resource": OutputFilesResource(
-            url=f"file://{os.path.join(DATA_DIR, "raw")}"
+            url=f"file://{os.path.join(DATA_DIR, 'raw')}"
         ),
         "staging_files_resource": OutputFilesResource(
-            url=f"file://{os.path.join(DATA_DIR, "staging")}"
+            url=f"file://{os.path.join(DATA_DIR, 'staging')}"
         ),
         "output_files_resource": OutputFilesResource(
-            url=f"file://{os.path.join(DATA_DIR, "output", "beta")}"
+            url=f"file://{os.path.join(DATA_DIR, 'output', 'beta')}"
         ),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
@@ -66,13 +66,13 @@ resources = {
     },
     "branch": {
         "raw_files_resource": OutputFilesResource(
-            url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/data/raw"
+            url=f"s3://weave.energy-branches/{os.getenv('DAGSTER_CLOUD_GIT_BRANCH')}/data/raw"
         ),
         "staging_files_resource": OutputFilesResource(
-            url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/data/staging"
+            url=f"s3://weave.energy-branches/{os.getenv('DAGSTER_CLOUD_GIT_BRANCH')}/data/staging"
         ),
         "output_files_resource": OutputFilesResource(
-            url=f"s3://weave.energy-branches/{os.getenv("DAGSTER_CLOUD_GIT_BRANCH")}/beta"
+            url=f"s3://weave.energy-branches/{os.getenv('DAGSTER_CLOUD_GIT_BRANCH')}/beta"
         ),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
@@ -108,9 +108,9 @@ def deployment_name():
         # above in all situations, so make sure we fail hard if we're about to use it
         # but it isn't for some reason
         # https://docs.dagster.io/dagster-plus/managing-deployments/reserved-environment-variables
-        assert (
-            "DAGSTER_CLOUD_GIT_BRANCH" in os.environ
-        ), "DAGSTER_CLOUD_GIT_BRANCH not set but DAGSTER_CLOUD_IS_BRANCH_DEPLOYMENT == 1"
+        assert "DAGSTER_CLOUD_GIT_BRANCH" in os.environ, (
+            "DAGSTER_CLOUD_GIT_BRANCH not set but DAGSTER_CLOUD_IS_BRANCH_DEPLOYMENT == 1"
+        )
         return "branch"
 
     # currently only prod, if it's not a branch deploy, is a cloud deployment
