@@ -197,7 +197,7 @@ def _dno_to_combined_geoparquet(
     )
 
 
-def _add_geoparquet_columns(batch: pa.RecordBatch) -> pa.Table:
+def _add_geoparquet_columns(table: pa.Table) -> pa.Table:
     # I tried adopting the code from geopandas directly, so that we could stick to
     # pyarrow throughout, but it is dense and hard to adapt. I got stuck on the fact
     # that we have some null locations, which I think geopandas works around through
@@ -206,7 +206,7 @@ def _add_geoparquet_columns(batch: pa.RecordBatch) -> pa.Table:
 
     # This is also unreliable in terms of data type conversions, so we do it first and
     # then apply our specific casts after to make sure things stay as we want them
-    df = batch.to_pandas(self_destruct=True)
+    df = table.to_pandas(self_destruct=True)
     df[["lat", "lng"]] = df["substation_geo_location"].str.split(",", n=1, expand=True)
     gdf = gpd.GeoDataFrame(
         df, geometry=gpd.points_from_xy(df["lng"], df["lat"], crs="EPSG:4326")
