@@ -83,8 +83,12 @@ def lv_feeder_combined_geoparquet(
                                 f"No data for {day} in {dno.value}, skipping"
                             )
                             continue
+                        else:
+                            context.log.info(
+                                f"Found {daily_dno_table.num_rows} rows for {day} in {monthly_file}"
+                            )
                         daily_dno_table = _dno_to_combined_geoparquet(
-                            dno, daily_dno_table
+                            context, dno, daily_dno_table
                         )
                 except FileNotFoundError:
                     context.log.info(
@@ -98,15 +102,18 @@ def lv_feeder_combined_geoparquet(
                     daily_table = pa.concat_tables([daily_table, daily_dno_table])
 
             if daily_table is None or daily_table.num_rows == 0:
-                context.log.info(f"No data for {day}, skipping")
+                context.log.info(f"No data for any DNO on {day}, skipping")
                 continue
 
+            context.log.info("Sorting data")
             daily_table = daily_table.sort_by(
                 [
                     ("data_collection_log_timestamp", "ascending"),
                     ("lv_feeder_unique_id", "ascending"),
                 ]
             )
+
+            context.log.info("Writing output")
             parquet_writer.write_table(daily_table)
 
             metadata["dagster/row_count"] += daily_table.num_rows
@@ -124,7 +131,7 @@ def lv_feeder_combined_geoparquet(
     if metadata["dagster/row_count"] == 0:
         context.log.info(f"No data found for {year}-{month:02d}, deleting output file")
         context.log.info(
-            f"Attempting to delete {output_files_resource.path("smart-meter", monthly_file)}"
+            f"Attempting to delete {output_files_resource.path('smart-meter', monthly_file)}"
         )
         output_files_resource.delete("smart-meter", monthly_file)
 
@@ -163,11 +170,17 @@ def _create_parquet_writer(out) -> pq.ParquetWriter:
     )
 
 
-def _dno_to_combined_geoparquet(dno: DNO, batch: pa.RecordBatch) -> pa.Table:
+def _dno_to_combined_geoparquet(
+    context: AssetExecutionContext, dno: DNO, table: pa.Table
+) -> pa.Table:
     # Clear any existing metadata to avoid clashes
-    batch = batch.replace_schema_metadata(None)
-    table = _add_geoparquet_columns(batch)
+    context.log.info("Clearing schema metadata")
+    table = table.replace_schema_metadata(None)
+    context.log.info("Adding geoparquet columns")
+    table = _add_geoparquet_columns(table)
+    context.log.info("Casting columns")
     table = _cast_columns(table)
+    context.log.info("Adding unique ids")
     table = _add_unique_id_columns(dno, table)
 
     return table.select(
