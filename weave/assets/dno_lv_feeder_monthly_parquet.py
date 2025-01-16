@@ -286,7 +286,18 @@ def nged_lv_feeder_monthly_parquet(
                     pc.replace_with_mask(
                         table.column(field),
                         pc.is_in(
-                            table.column(field), pa.array(["", ", "])
+                            table.column(field),
+                            pa.array(
+                                [
+                                    "",
+                                    " ",
+                                    ",",
+                                    " ,",
+                                    ", ",
+                                    " , ",
+                                ],
+                                pa.string(),
+                            ),
                         ).combine_chunks(),
                         pa.scalar(None, pa.string()),
                     ),

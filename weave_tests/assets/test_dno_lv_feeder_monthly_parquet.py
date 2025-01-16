@@ -194,44 +194,40 @@ class TestSSENLVFeederMonthlyParquet:
         }
 
         for idx, expected_values in expected.items():
-            assert (
-                df.iloc[idx][expected_values.keys()].to_dict() == expected_values
-            ), f"Expected data at {idx} to be sorted by the appropriate columns"
+            assert df.iloc[idx][expected_values.keys()].to_dict() == expected_values, (
+                f"Expected data at {idx} to be sorted by the appropriate columns"
+            )
 
 
 class TestNGEDLVFeederMonthlyParquet:
-    def test_happy_path(self, tmp_path):
-        instance = DagsterInstance.ephemeral()
-
-        output_dir = tmp_path / "staging" / "nged"
-        output_dir.mkdir(parents=True)
+    def create_part_files(self, tmp_path, month, instance):
         input_dir = tmp_path / "raw" / "nged"
         input_dir.mkdir(parents=True)
 
-        # TODO - we should refactor this to use the factory function
-        fixture_file = os.path.join(
-            FIXTURE_DIR,
-            "nged",
-            "lv_feeder_files",
-            "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv",
-        )
+        data = nged_lv_feeder_raw_csv_factory(month)
+        df = pd.DataFrame.from_records(data=data)
+        df_parts = np.array_split(df, 10)
         for part in range(10):
-            filename = (
-                f"aggregated-smart-meter-data-lv-feeder-2024-01-part{part:04d}.csv"
-            )
+            filename = f"aggregated-smart-meter-data-lv-feeder-2024-{month:02d}-part{part:04d}.csv"
             partition = f"http://example.com/{filename}"
-            with open((input_dir / f"{filename}.gz").as_posix(), "wb") as output_file:
-                with open(fixture_file, "rb") as f:
-                    output_file.write(
-                        zlib_ng.compress(
-                            f.read(), level=1, wbits=zlib_ng.MAX_WBITS | 16
-                        )
-                    )
+            df_parts[part].to_csv(
+                (input_dir / f"{filename}.gz").as_posix(),
+                index=False,
+                compression="gzip",
+            )
             instance.report_runless_asset_event(
                 AssetMaterialization(
                     asset_key=AssetKey("nged_lv_feeder_files"), partition=partition
                 )
             )
+
+    def test_happy_path(self, tmp_path):
+        instance = DagsterInstance.ephemeral()
+
+        self.create_part_files(tmp_path, 1, instance)
+
+        output_dir = tmp_path / "staging" / "nged"
+        output_dir.mkdir(parents=True)
 
         context = build_asset_context(partition_key="2024-01-01", instance=instance)
         staging_files_resource = OutputFilesResource(
@@ -245,14 +241,35 @@ class TestNGEDLVFeederMonthlyParquet:
         )
 
         df = pd.read_parquet(output_dir / "2024-01.parquet", engine="pyarrow")
-        assert len(df) == 100
+        assert len(df) == 3 * 2 * 31  # 3 substations * 2 feeders * 31 days
         assert df.columns.tolist() == lv_feeder_parquet_schema.names
-        assert result.metadata["dagster/row_count"] == 100
-        assert result.metadata["weave/nunique_feeders"] == 1
+        assert result.metadata["dagster/row_count"] == 3 * 2 * 31
+        assert result.metadata["weave/nunique_feeders"] == 3 * 2
+
+        # Check conversion of empty string to null and backfill of NGED dno_alias
+        missing_data_row = df[df["secondary_substation_id"] == "345678"].iloc[0]
+        assert missing_data_row.to_dict() == {
+            "dataset_id": None,
+            "dno_alias": "NGED",
+            "secondary_substation_id": "345678",
+            "secondary_substation_name": None,
+            "lv_feeder_id": "1",
+            "lv_feeder_name": "1",
+            "substation_geo_location": None,
+            "aggregated_device_count_active": 15.3,
+            "total_consumption_active_import": 2331.5,
+            "data_collection_log_timestamp": pd.Timestamp(
+                "2024-01-01T00:30:00+00:00", tz="UTC"
+            ),
+            "insert_time": pd.Timestamp("2024-02-14T00:07:06+00:00", tz="UTC"),
+            "last_modified_time": pd.Timestamp("2024-02-25T12:46:46+00:00", tz="UTC"),
+        }
 
     def test_when_missing_input(self, tmp_path):
         output_dir = tmp_path / "staging" / "ssen"
         output_dir.mkdir(parents=True)
+
+        # Create the folder but no files in it
         input_dir = tmp_path / "raw" / "ssen"
         input_dir.mkdir(parents=True)
 
@@ -274,30 +291,10 @@ class TestNGEDLVFeederMonthlyParquet:
     def test_sorting_output(self, tmp_path):
         instance = DagsterInstance.ephemeral()
 
+        self.create_part_files(tmp_path, 1, instance)
+
         output_dir = tmp_path / "staging" / "nged"
         output_dir.mkdir(parents=True)
-        input_dir = tmp_path / "raw" / "nged"
-        input_dir.mkdir(parents=True)
-
-        # Generate test data and save into part files
-        data = nged_lv_feeder_raw_csv_factory(1)
-        df = pd.DataFrame.from_records(data=data)
-        df_parts = np.array_split(df, 10)
-        for part in range(10):
-            filename = (
-                f"aggregated-smart-meter-data-lv-feeder-2024-01-part{part:04d}.csv"
-            )
-            partition = f"http://example.com/{filename}"
-            df_parts[part].to_csv(
-                (input_dir / f"{filename}.gz").as_posix(),
-                index=False,
-                compression="gzip",
-            )
-            instance.report_runless_asset_event(
-                AssetMaterialization(
-                    asset_key=AssetKey("nged_lv_feeder_files"), partition=partition
-                )
-            )
 
         context = build_asset_context(partition_key="2024-01-01", instance=instance)
         staging_files_resource = OutputFilesResource(
@@ -345,9 +342,9 @@ class TestNGEDLVFeederMonthlyParquet:
         }
 
         for idx, expected_values in expected.items():
-            assert (
-                df.iloc[idx][expected_values.keys()].to_dict() == expected_values
-            ), f"Expected data at {idx} to be sorted by the appropriate columns"
+            assert df.iloc[idx][expected_values.keys()].to_dict() == expected_values, (
+                f"Expected data at {idx} to be sorted by the appropriate columns"
+            )
 
 
 def nged_lv_feeder_raw_csv_factory(month: int):
@@ -369,7 +366,7 @@ def nged_lv_feeder_raw_csv_factory(month: int):
         "",
     ]
     feeder_ids = ["1", "2"]
-    locations = ["52.7149, -2.4298", "52.0332, -.6461", ""]
+    locations = ["52.7149, -2.4298", "52.0332, -.6461", ", "]
 
     data = []
 
