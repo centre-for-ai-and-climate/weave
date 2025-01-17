@@ -136,8 +136,8 @@ def create_monthly_parquet_files(tmp_path):
 
 
 def test_lv_feeder_combined_geoparquet(tmp_path):
-    output_dir = tmp_path / "output"
-    output_dir.mkdir()
+    output_dir = tmp_path / "output" / "smart-meter"
+    output_dir.mkdir(parents=True)
 
     create_monthly_parquet_files(tmp_path)
 
@@ -153,7 +153,7 @@ def test_lv_feeder_combined_geoparquet(tmp_path):
     assert result.metadata["weave/nunique_feeders"] == 6 * 2
     assert result.metadata["weave/nunique_substations"] == 3 * 2
 
-    gdf = gpd.read_parquet(output_dir / "smart-meter" / "2024-02.parquet")
+    gdf = gpd.read_parquet(tmp_path / "output" / "smart-meter" / "2024-02.parquet")
     assert len(gdf) == 6 * 29 * 2  # 6 feeders * 29 days (2024 was a leap year)
 
     assert gdf.columns.tolist() == [
@@ -211,9 +211,9 @@ def test_lv_feeder_combined_geoparquet(tmp_path):
     }
 
     for idx, expected_values in expected.items():
-        assert (
-            gdf.iloc[idx][expected_values.keys()].to_dict() == expected_values
-        ), f"Expected data at {idx} to be sorted by the appropriate columns"
+        assert gdf.iloc[idx][expected_values.keys()].to_dict() == expected_values, (
+            f"Expected data at {idx} to be sorted by the appropriate columns"
+        )
 
     # Locations are parsed to geometries correctly (including empty ones)
     assert gdf.iloc[0].geometry == Point(-0.6461, 52.0332)
@@ -258,8 +258,8 @@ def test_lv_feeder_combined_geoparquet_handles_partially_missing_input(tmp_path)
     ssen_input_dir.mkdir(parents=True)
     nged_input_dir = tmp_path / "staging" / "nged"
     nged_input_dir.mkdir(parents=True)
-    output_dir = tmp_path / "output"
-    output_dir.mkdir()
+    output_dir = tmp_path / "output" / "smart-meter"
+    output_dir.mkdir(parents=True)
 
     # Make some data, but not all of it:
     # - No SSEN data, to test a missing DNO
@@ -278,5 +278,5 @@ def test_lv_feeder_combined_geoparquet_handles_partially_missing_input(tmp_path)
         context, staging_files_resource, output_files_resource
     )
 
-    gdf = gpd.read_parquet(output_dir / "smart-meter" / "2024-01.parquet")
+    gdf = gpd.read_parquet(tmp_path / "output" / "smart-meter" / "2024-01.parquet")
     assert len(gdf) == 6 * 16  # 6 feeders * 16 odd-numbered days in January
