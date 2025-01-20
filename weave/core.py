@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pyproj
 from pydantic import BaseModel, HttpUrl
 
@@ -49,6 +50,17 @@ lv_feeder_parquet_schema = pa.schema(
     ]
 )
 
+lv_feeder_parquet_sort_order = [
+    ("data_collection_log_timestamp", "ascending"),
+    ("dno_alias", "ascending"),
+    ("secondary_substation_id", "ascending"),
+    ("lv_feeder_id", "ascending"),
+]
+
+lv_feeder_parquet_sorting_columns = pq.SortingColumn.from_ordering(
+    lv_feeder_parquet_schema, lv_feeder_parquet_sort_order
+)
+
 lv_feeder_geoparquet_schema = pa.schema(
     [
         ("dataset_id", pa.string()),
@@ -91,4 +103,15 @@ lv_feeder_geoparquet_schema = pa.schema(
             }
         ).encode("utf-8"),
     },
+)
+
+lv_feeder_geoparquet_sort_order = [
+    ("data_collection_log_timestamp", "ascending"),
+    ("dno_alias", "ascending"),
+    ("secondary_substation_unique_id", "ascending"),
+    ("lv_feeder_unique_id", "ascending"),
+]
+
+lv_feeder_geoparquet_sorting_columns = pq.SortingColumn.from_ordering(
+    lv_feeder_geoparquet_schema, lv_feeder_geoparquet_sort_order
 )

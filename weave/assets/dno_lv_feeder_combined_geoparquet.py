@@ -16,7 +16,12 @@ from dagster import (
 from geopandas.io.arrow import _geopandas_to_arrow
 
 from ..automation_conditions import lv_feeder_combined_geoparquet_needs_updating
-from ..core import DNO, lv_feeder_geoparquet_schema
+from ..core import (
+    DNO,
+    lv_feeder_geoparquet_schema,
+    lv_feeder_geoparquet_sort_order,
+    lv_feeder_geoparquet_sorting_columns,
+)
 from ..resources.output_files import OutputFilesResource
 
 
@@ -115,12 +120,7 @@ def lv_feeder_combined_geoparquet(
                 continue
 
             context.log.info("Sorting data")
-            daily_table = daily_table.sort_by(
-                [
-                    ("data_collection_log_timestamp", "ascending"),
-                    ("lv_feeder_unique_id", "ascending"),
-                ]
-            )
+            daily_table = daily_table.sort_by(lv_feeder_geoparquet_sort_order)
 
             context.log.info("Writing output")
             parquet_writer.write_table(daily_table)
@@ -162,22 +162,6 @@ def lv_feeder_combined_geoparquet(
 
 
 def _create_parquet_writer(out) -> pq.ParquetWriter:
-    # Technically, we only sort the data by timestamp and feeder id, but because of how
-    # the feeder ids are created (concatenating alias + substation + feeder), we can
-    # say that the data is sorted by all three columns and potentially speed up
-    # filtering on any of them.
-    sorting_columns = [
-        pq.SortingColumn(
-            lv_feeder_geoparquet_schema.names.index("data_collection_log_timestamp")
-        ),
-        pq.SortingColumn(lv_feeder_geoparquet_schema.names.index("dno_alias")),
-        pq.SortingColumn(
-            lv_feeder_geoparquet_schema.names.index("secondary_substation_unique_id")
-        ),
-        pq.SortingColumn(
-            lv_feeder_geoparquet_schema.names.index("lv_feeder_unique_id")
-        ),
-    ]
     return pq.ParquetWriter(
         out,
         schema=lv_feeder_geoparquet_schema,
@@ -185,7 +169,7 @@ def _create_parquet_writer(out) -> pq.ParquetWriter:
         compression_level=9,
         coerce_timestamps="ms",
         allow_truncated_timestamps=True,
-        sorting_columns=sorting_columns,
+        sorting_columns=lv_feeder_geoparquet_sorting_columns,
         store_decimal_as_integer=True,
     )
 

@@ -17,7 +17,12 @@ from dagster import (
 from fsspec.core import OpenFile
 
 from ..automation_conditions import ssen_lv_feeder_monthly_parquet_needs_updating
-from ..core import DNO, lv_feeder_parquet_schema
+from ..core import (
+    DNO,
+    lv_feeder_parquet_schema,
+    lv_feeder_parquet_sort_order,
+    lv_feeder_parquet_sorting_columns,
+)
 from ..dagster_helpers import get_materialisations
 from ..resources.nged import NGEDAPIClient
 from ..resources.output_files import OutputFilesResource
@@ -96,12 +101,7 @@ def ssen_lv_feeder_monthly_parquet(
             table = table.drop_columns(
                 ["substation_nrn", "substation_geo_location_lookup"]
             )
-            table = table.sort_by(
-                [
-                    ("data_collection_log_timestamp", "ascending"),
-                    ("dataset_id", "ascending"),
-                ]
-            )
+            table = table.sort_by(lv_feeder_parquet_sort_order)
 
             parquet_writer.write_table(table)
 
@@ -129,20 +129,7 @@ def _ssen_files_for_month(year: int, month: int) -> list[str]:
 
 
 def _create_parquet_writer(out: OpenFile, sorted=True) -> pq.ParquetWriter:
-    default_sorting_columns = [
-        pq.SortingColumn(
-            lv_feeder_parquet_schema.names.index("data_collection_log_timestamp")
-        ),
-        pq.SortingColumn(lv_feeder_parquet_schema.names.index("dno_alias")),
-        pq.SortingColumn(
-            lv_feeder_parquet_schema.names.index("secondary_substation_id")
-        ),
-        pq.SortingColumn(lv_feeder_parquet_schema.names.index("lv_feeder_id")),
-    ]
-    if sorted:
-        sorting_columns = default_sorting_columns
-    else:
-        sorting_columns = None
+    sorting_columns = lv_feeder_parquet_sorting_columns if sorted else None
 
     return pq.ParquetWriter(
         out, lv_feeder_parquet_schema, sorting_columns=sorting_columns
