@@ -44,7 +44,7 @@ resources = {
             url=f"file://{os.path.join(DATA_DIR, 'staging')}"
         ),
         "output_files_resource": OutputFilesResource(
-            url=f"file://{os.path.join(DATA_DIR, 'output', 'beta')}"
+            url=f"file://{os.path.join(DATA_DIR, 'output')}"
         ),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
@@ -57,7 +57,7 @@ resources = {
         "staging_files_resource": OutputFilesResource(
             url="s3://weave.energy-dev/data/staging"
         ),
-        "output_files_resource": OutputFilesResource(url="s3://weave.energy-dev/beta"),
+        "output_files_resource": OutputFilesResource(url="s3://weave.energy-dev"),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
         "nged_api_client": LiveNGEDAPIClient(
@@ -72,7 +72,7 @@ resources = {
             url=f"s3://weave.energy-branches/{os.getenv('DAGSTER_CLOUD_GIT_BRANCH')}/data/staging"
         ),
         "output_files_resource": OutputFilesResource(
-            url=f"s3://weave.energy-branches/{os.getenv('DAGSTER_CLOUD_GIT_BRANCH')}/beta"
+            url=f"s3://weave.energy-branches/{os.getenv('DAGSTER_CLOUD_GIT_BRANCH')}"
         ),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
@@ -85,7 +85,7 @@ resources = {
         "staging_files_resource": OutputFilesResource(
             url="s3://weave.energy/data/staging"
         ),
-        "output_files_resource": OutputFilesResource(url="s3://weave.energy/beta"),
+        "output_files_resource": OutputFilesResource(url="s3://weave.energy"),
         "ssen_api_client": LiveSSENAPIClient(),
         "ons_api_client": LiveONSAPIClient(),
         "nged_api_client": LiveNGEDAPIClient(
