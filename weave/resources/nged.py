@@ -99,7 +99,7 @@ class NGEDAPIClient(ConfigurableResource, ABC):
 class LiveNGEDAPIClient(NGEDAPIClient):
     def get_available_files(self) -> list[AvailableFile]:
         r = requests.get(
-            self.lv_feeder_datapackage_url, timeout=5, headers=self._request_headers()
+            self.lv_feeder_datapackage_url, timeout=30, headers=self._request_headers()
         )
         r.raise_for_status()
         return self._map_available_files(r.json())
