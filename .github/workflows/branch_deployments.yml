@@ -10,8 +10,8 @@ concurrency:
 env:
   DAGSTER_CLOUD_URL: "http://centre-for-ai-and-climate.dagster.cloud"
   DAGSTER_CLOUD_API_TOKEN: ${{ secrets.DAGSTER_CLOUD_API_TOKEN }}
-  ENABLE_FAST_DEPLOYS: 'true'
-  DAGSTER_CLOUD_FILE: 'dagster_cloud.yaml'
+  ENABLE_FAST_DEPLOYS: "true"
+  DAGSTER_CLOUD_FILE: "dagster_cloud.yaml"
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
@@ -23,7 +23,7 @@ jobs:
   dagster_cloud_default_deploy:
     name: Dagster Serverless Deploy
     needs: tests
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Prerun Checks
