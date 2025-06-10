@@ -78,7 +78,7 @@ class NGEDAPIClient(ConfigurableResource, ABC):
                 tzinfo=timezone.utc
             )
             if re.match(
-                r"aggregated-smart-meter-data-lv-feeder-\d{4}-\d{2}-part\d{4}\.csv",
+                r"aggregated-smart-meter-data-lv-feeder-\d{4}-\d{2}-part\d{4}\.csv\.gz$",
                 filename,
             ):
                 available.append(
@@ -109,7 +109,7 @@ class LiveNGEDAPIClient(NGEDAPIClient):
         context: AssetExecutionContext,
         url: str,
         output_file: OpenFile,
-        gzip: bool = True,
+        gzip: bool = False,
     ) -> None:
         """Stream a file from the given URL to the given file, optionally gzip
         compressing on the fly"""
@@ -154,7 +154,7 @@ class StubNGEDAPIClient(NGEDAPIClient):
         with open(self.lv_feeder_datapackage_url) as f:
             return self._map_available_files(json.load(f))
 
-    def download_file(self, _context, _url, output_file, gzip=True) -> None:
+    def download_file(self, _context, _url, output_file, gzip=False) -> None:
         with open(self.file_to_download, "rb") as f:
             if gzip:
                 output_file.write(

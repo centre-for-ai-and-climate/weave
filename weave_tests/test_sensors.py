@@ -85,23 +85,23 @@ class TestNGEDLVFeederFilesSensor:
     def test_clean_slate(self, instance, api_client):
         context = build_sensor_context(instance=instance)
         result = nged_lv_feeder_files_sensor(context, nged_api_client=api_client)
-        assert len(result.run_requests) == 1553
+        assert len(result.run_requests) == 1261
         assert (
             result.run_requests[0].partition_key
-            == "https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/105a7821-7f5c-4591-90e8-5915f253b1ff/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv"
+            == "https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/83fc80ad-954a-4a12-9760-2c6a0854f029/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv.gz"
         )
 
     def test_with_cursor(self, instance, api_client):
-        context = build_sensor_context(instance=instance, cursor="2024-11-30T19:53:57Z")
+        context = build_sensor_context(instance=instance, cursor="2025-05-31T18:49:13Z")
         result = nged_lv_feeder_files_sensor(context, nged_api_client=api_client)
         assert len(result.run_requests) == 1
         assert (
             result.run_requests[0].partition_key
-            == "https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/a34789d4-258e-4fa4-9232-0988d0980ad1/download/aggregated-smart-meter-data-lv-feeder-2024-10-part0227.csv"
+            == "https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/b82a3a6f-18c2-47aa-83f1-9c1c3e0b43a6/download/aggregated-smart-meter-data-lv-feeder-2025-04-part0162.csv.gz"
         )
 
     def test_no_results(self, instance, api_client):
-        context = build_sensor_context(instance=instance, cursor="2024-12-18T00:00:00Z")
+        context = build_sensor_context(instance=instance, cursor="2025-06-01T00:00:00Z")
         result = nged_lv_feeder_files_sensor(context, nged_api_client=api_client)
         assert isinstance(result, SkipReason)
 
