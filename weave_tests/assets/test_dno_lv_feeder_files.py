@@ -65,7 +65,7 @@ class TestNGEDLVFeederFiles:
         output_dir = tmp_path / "nged"
         output_dir.mkdir()
         context = build_asset_context(
-            partition_key="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/105a7821-7f5c-4591-90e8-5915f253b1ff/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv"
+            partition_key="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/105a7821-7f5c-4591-90e8-5915f253b1ff/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv.gz"
         )
         raw_files_resource = OutputFilesResource(url=tmp_path.as_uri())
         api_client = StubNGEDAPIClient(
@@ -74,7 +74,7 @@ class TestNGEDLVFeederFiles:
                 FIXTURE_DIR,
                 "nged",
                 "lv_feeder_files",
-                "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv",
+                "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv.gz",
             ),
         )
         nged_lv_feeder_files(context, raw_files_resource, api_client)

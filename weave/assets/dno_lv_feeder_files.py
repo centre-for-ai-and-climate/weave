@@ -85,7 +85,7 @@ def nged_lv_feeder_files(
 ):
     metadata = {}
     url = context.partition_key
-    filename = f"{NGEDAPIClient.filename_for_url(url)}.gz"
+    filename = f"{NGEDAPIClient.filename_for_url(url)}"
     with raw_files_resource.open(DNO.NGED.value, filename, mode="wb") as f:
         nged_api_client.download_file(context, url, f)
     with raw_files_resource.open(DNO.NGED.value, filename, mode="rb") as f:

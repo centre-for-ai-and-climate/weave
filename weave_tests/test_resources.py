@@ -174,12 +174,12 @@ class TestLiveONSClient:
             assert df["lat"].dtype == "float", "lat should be float"
             assert df["long"].dtype == "float", "long should be float"
             df.set_index("pcd", inplace=True)
-            assert pd.isna(
-                df.loc["AB1 0AN"].lat
-            ), "99.999999 lats should be parsed as NaN"
-            assert pd.isna(
-                df.loc["AB1 0AN"].long
-            ), "0.000000 longs should parsed as NaN"
+            assert pd.isna(df.loc["AB1 0AN"].lat), (
+                "99.999999 lats should be parsed as NaN"
+            )
+            assert pd.isna(df.loc["AB1 0AN"].long), (
+                "0.000000 longs should parsed as NaN"
+            )
 
 
 class TestLiveNGEDAPIClient:
@@ -199,8 +199,9 @@ class TestLiveNGEDAPIClient:
                 FIXTURE_DIR,
                 "nged",
                 "lv_feeder_files",
-                "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv",
-            )
+                "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv.gz",
+            ),
+            "rb",
         ) as f:
             yield f.read()
 
@@ -214,16 +215,16 @@ class TestLiveNGEDAPIClient:
                 match=[matchers.header_matcher({"Authorization": "TEST"})],
             )
             results = api_client.get_available_files()
-            assert len(results) == 1553
+            assert len(results) == 1261
             assert results[0] == AvailableFile(
-                filename="aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv",
-                url="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/105a7821-7f5c-4591-90e8-5915f253b1ff/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv",
-                created=datetime(2024, 3, 1, 14, 1, 7, 645482, tzinfo=timezone.utc),
+                filename="aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv.gz",
+                url="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/83fc80ad-954a-4a12-9760-2c6a0854f029/download/aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv.gz",
+                created=datetime(2025, 3, 24, 20, 29, 3, 194540, tzinfo=timezone.utc),
             )
             assert results[-1] == AvailableFile(
-                filename="aggregated-smart-meter-data-lv-feeder-2024-10-part0228.csv",
-                url="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/58e33df9-ca79-48b2-8ead-7446a502064a/download/aggregated-smart-meter-data-lv-feeder-2024-10-part0228.csv",
-                created=datetime(2024, 11, 30, 19, 53, 56, 287608, tzinfo=timezone.utc),
+                filename="aggregated-smart-meter-data-lv-feeder-2025-04-part0162.csv.gz",
+                url="https://connecteddata.nationalgrid.co.uk/dataset/a920c581-9c6f-4788-becc-9d2caf20050c/resource/b82a3a6f-18c2-47aa-83f1-9c1c3e0b43a6/download/aggregated-smart-meter-data-lv-feeder-2025-04-part0162.csv.gz",
+                created=datetime(2025, 5, 31, 18, 49, 34, 531661, tzinfo=timezone.utc),
             )
 
     def test_download_file_gzip(self, tmp_path, api_client, csv_response):
@@ -247,21 +248,12 @@ class TestLiveNGEDAPIClient:
             assert len(df) == 10
 
     def test_lv_feeder_file_pyarrow_table(self, tmp_path, api_client):
-        input_file = os.path.join(
+        gzipped_file = os.path.join(
             FIXTURE_DIR,
             "nged",
             "lv_feeder_files",
-            "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv",
+            "aggregated-smart-meter-data-lv-feeder-2024-01-part0000_head.csv.gz",
         )
-        with open(input_file, "rb") as f:
-            gzipped_file = (
-                tmp_path
-                / "aggregated-smart-meter-data-lv-feeder-2024-01-part0000.csv.gz"
-            )
-            with open(gzipped_file, "wb") as output_file:
-                output_file.write(
-                    zlib_ng.compress(f.read(), level=1, wbits=zlib_ng.MAX_WBITS | 16)
-                )
 
         with open(gzipped_file, "rb") as f:
             table = api_client.lv_feeder_file_pyarrow_table(f)
